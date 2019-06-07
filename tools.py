@@ -357,10 +357,8 @@ def build_pageset(pageset, options, s3=None, production=False):
     j2_env.filters['markdown'] = markdown_filter
     pages = get_pages(pageset['files'], production)
     for page in pages:
-        f_id = os.path.splitext(os.path.basename(page['src']))[0]
-        page['data']['id'] = f_id 
         page['data']['production'] = production
-        if 'site_globals' in page['data']:
+        if 'site_globals' in options:
             page['data']['site_globals'] = options['site_globals']
         if 'nav' in pageset_options:
             page['data']['nav_pages'] = pageset_options['nav_pages']
