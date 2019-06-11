@@ -143,6 +143,13 @@ def copy_files(files_to_copy):
                                                os.path.basename(file)))
             print(' Done!')
 
+def link_static(src, dest):
+    print((f'linking {src} to {dest}...'), end='')
+    subprocess.run(['ln', '-s', 
+                    os.path.expanduser(src), 
+                    os.path.expanduser(dest)])
+    print(' Done!')
+    
 
 
 # #### #
