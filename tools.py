@@ -247,9 +247,9 @@ def handle_images(options, s3=None, production=None):
                 print(' Done!')
     else:
         image_dest = options["prod"]
-        local_prod = os.path.expanduser(image_dest)
+        local_prod = os.path.expanduser(options["local_static"])
         print((f'linking {local_images} to {local_prod}...'), end='')
-        subprocess.run(['ln', '-s', local_images, local_prod])
+        subprocess.run(['ln', '-s', local_prod, image_dest])
         print(' Done!')
 
 
