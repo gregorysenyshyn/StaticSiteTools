@@ -14,11 +14,10 @@ import sass
 import yaml
 import boto3
 import htmlmin
-import mistune 
+import mistune
 import frontmatter
-from termcolor import colored
 
-CACHE_CONTROL_AGE=86400
+CACHE_CONTROL_AGE = 86400
 
 
 # ####### #
@@ -39,7 +38,6 @@ class GlobLoader(BaseLoader):
         files = [self.concat_paths(item) for item in paths]
         self.files = list(itertools.chain.from_iterable(files))
 
-
     @classmethod
     def concat_paths(cls, paths_to_concat):
         '''
@@ -56,7 +54,6 @@ class GlobLoader(BaseLoader):
                                     negative_match)
         return list(set(positive_match) - set(negative_match))
 
-
     @staticmethod
     def append_path_to_list(path_to_append, positive_match, negative_match):
         '''
@@ -66,7 +63,6 @@ class GlobLoader(BaseLoader):
             negative_match += glob.glob(path_to_append[1:])
         else:
             positive_match += glob.glob(path_to_append)
-
 
     def get_source(self, environment, template):
         for item in self.files:
@@ -84,9 +80,9 @@ def get_s3():
 
 def send_to_s3(s3, bucket, src, dest, metadata={}):
     with open(src, 'rb') as f:
-        s3.Object(bucket, dest).put(Body=f, 
-              ContentType=metadata['ContentType'],
-              CacheControl=metadata['CacheControl'])
+        s3.Object(bucket, dest).put(Body=f,
+                                    ContentType=metadata['ContentType'],
+                                    CacheControl=metadata['CacheControl'])
 
 
 def search_include_paths(target_filename, include_paths):
@@ -138,18 +134,19 @@ def copy_files(files_to_copy):
         file_list = GlobLoader(files_to_copy[dest_path]).files
         for file in file_list:
             print((f'Copying {os.path.basename(file)} to {dest_path}'
-                    '...'), end="")
+                   '...'),
+                  end="")
             shutil.copyfile(file, os.path.join(dest_path,
                                                os.path.basename(file)))
             print(' Done!')
 
+
 def link_static(src, dest):
     print((f'linking {src} to {dest}...'), end='')
-    subprocess.run(['ln', '-s', 
-                    os.path.expanduser(src), 
+    subprocess.run(['ln', '-s',
+                    os.path.expanduser(src),
                     os.path.expanduser(dest)])
     print(' Done!')
-    
 
 
 # #### #
@@ -164,16 +161,17 @@ def handle_js(js_paths, js_include_paths, options, s3=None, production=False):
         js_string = concat_files(js_paths[dest_path], js_include_paths)
         if production:
             print(f"Done!\nSending to S3...", end="")
-            s3.Object(options['s3 bucket'], dest_path
-                ).put(Body=js_string, 
-                      ContentType='text/javascript',
-                      CacheControl=f'max-age={CACHE_CONTROL_AGE}')
+            s3.Object(options['s3 bucket'], dest_path).put(
+                Body=js_string,
+                ContentType='text/javascript',
+                CacheControl=f'max-age={CACHE_CONTROL_AGE}'
+                )
         else:
             os.makedirs(os.path.join(options['prod'],
-                                     os.path.split(dest_path)[0]), 
+                                     os.path.split(dest_path)[0]),
                         exist_ok=True)
             with open(os.path.join(options['prod'], dest_path), 'w') as f:
-                    f.write(js_string)
+                f.write(js_string)
         print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
 
 
@@ -182,26 +180,28 @@ def handle_js(js_paths, js_include_paths, options, s3=None, production=False):
 # ###### #
 
 
-def write_css_file(destination, scss_string, options=None, s3=None, production=False):
+def write_css_file(destination, scss_string,
+                   options=None, s3=None, production=False):
     if production:
         print(f"Done!\nSending to S3...", end="")
-        css_string = sass.compile(string=scss_string, 
+        css_string = sass.compile(string=scss_string,
                                   output_style='compressed')
-        s3.Object(options['s3 bucket'], destination
-                ).put(Body=css_string,
-                      ContentType='text/css',
-                      CacheControl=f'max-age={CACHE_CONTROL_AGE}')
+        s3.Object(options['s3 bucket'], destination).put(
+            Body=css_string,
+            ContentType='text/css',
+            CacheControl=f'max-age={CACHE_CONTROL_AGE}')
     else:
         with open(destination, 'w') as f:
             f.write(sass.compile(string=scss_string))
 
 
-def handle_scss(scss_paths, scss_include_paths, options=None, s3=None, production=False):
+def handle_scss(scss_paths, scss_include_paths,
+                options=None, s3=None, production=False):
     for dest_path in scss_paths:
         t1 = time.time()
         print('Generating {0}...'.format(dest_path), end="")
         scss_string = concat_files(scss_paths[dest_path], scss_include_paths)
-        if production: 
+        if production:
             write_css_file(dest_path,
                            scss_string,
                            options,
@@ -209,7 +209,7 @@ def handle_scss(scss_paths, scss_include_paths, options=None, s3=None, productio
                            production)
         else:
             os.makedirs(os.path.join(options['prod'],
-                                     os.path.split(dest_path)[0]), 
+                                     os.path.split(dest_path)[0]),
                         exist_ok=True)
             write_css_file(os.path.join(options['prod'],
                                         dest_path),
@@ -219,6 +219,7 @@ def handle_scss(scss_paths, scss_include_paths, options=None, s3=None, productio
 # ######## #
 #  IMAGES  #
 # ######## #
+
 
 def handle_images(options, s3=None, production=None):
     image_src = options["local_images"]
@@ -239,7 +240,7 @@ def handle_images(options, s3=None, production=None):
             local_filename = os.path.join(local_images, filename)
             remote_filename = os.path.join(options["remote_images"], filename)
             if not filename.startswith('.'):
-                print(f'Copying {local_filename} to {remote_filename}...', 
+                print(f'Copying {local_filename} to {remote_filename}...',
                       end='')
                 obj = s3_bucket.Object(remote_filename)
                 with open(local_filename, 'rb') as f:
@@ -253,10 +254,10 @@ def handle_images(options, s3=None, production=None):
         print(' Done!')
 
 
-
 # ###### #
 #  HTML  #
 # ###### #
+
 
 def markdown_filter(text):
     renderer = mistune.Renderer(parse_html=True)
@@ -290,7 +291,7 @@ def get_nav_pages(files, production):
                 fileset_pages.append(glob_page)
         for page_name in fileset_pages:
             page = {'src': page_name,
-                    'dest': get_destination(page_name, 
+                    'dest': get_destination(page_name,
                                             fileset['dest'],
                                             production)}
             set_page_metadata(page)
@@ -302,9 +303,9 @@ def get_nav_pages(files, production):
                 if 'subtitle' in page['data']:
                     nav_data['subtitle'] = page['data']['subtitle']
                 nav_pages.append(nav_data)
-                     
+
     nav_pages = sorted(nav_pages, key=lambda x: x['order'])
-    return nav_pages 
+    return nav_pages
 
 
 def set_page_metadata(page, index=False):
@@ -323,7 +324,7 @@ def set_page_metadata(page, index=False):
             page['content'] = fm_page.content
     else:
         print(f"{page['src']} must be in either .yaml,"
-                ' .md or .html (jinja2) format!')
+              ' .md or .html (jinja2) format!')
 
 
 def get_pages(files, production):
@@ -338,15 +339,15 @@ def get_pages(files, production):
         current_filenames = GlobLoader.concat_paths(fileset['src'])
 
         for filename in current_filenames:
-            page = ({'src': filename, 
+            page = ({'src': filename,
                      'dest': get_destination(filename,
-                                             fileset['dest'], 
+                                             fileset['dest'],
                                              production),
                      'template': fileset['template']})
 
             set_page_metadata(page)
             pages.append(page)
-            
+
     return pages
 
 
@@ -357,7 +358,7 @@ def build_pageset(pageset, options, s3=None, production=False):
                       if pathset in ['partials', 'layouts']]
     pageset_options = pageset['options']
     if 'nav' in pageset_options:
-        pageset_options['nav_pages'] = get_nav_pages(pageset['files'], 
+        pageset_options['nav_pages'] = get_nav_pages(pageset['files'],
                                                      production)
 
     j2_env = Environment(loader=GlobLoader(template_files), trim_blocks=True)
@@ -372,18 +373,11 @@ def build_pageset(pageset, options, s3=None, production=False):
         page_time = time.time()
         print(f'Building {page["src"]}...', end='')
         if 'content' in page:
-            final_page = j2_env.from_string(page['content']
-                            ).render(page['data'])
+            final_page = j2_env.from_string(
+                page['content']).render(page['data'])
         else:
             template = j2_env.get_template(page['template'])
-            final_page = template.render(page['data']) 
-
-        # UPDATE HTML TIDY BEFORE UNCOMMENTING
-        # tidy_page, errors = tidy_document(final_page)
-        # if errors:
-        #     error_page = os.path.basename(page['src'])
-        #     with open('HTMLTidy Errors', 'a') as f:
-        #         f.write('{0}:\n{1}'.format(error_page, errors))
+            final_page = template.render(page['data'])
 
         print(f' Done writing {page["dest"]} in '
               f'{round(float(time.time() - page_time), 4)} seconds')
@@ -391,8 +385,8 @@ def build_pageset(pageset, options, s3=None, production=False):
         if production:
             final_page = htmlmin.minify(final_page)
             print(f'Sending {page["dest"]} to S3...', end='')
-            s3.Object(options['s3 bucket'], page['dest']
-                    ).put(Body=final_page, ContentType='text/html')
+            s3.Object(options['s3 bucket'], page['dest']).put(
+                Body=final_page, ContentType='text/html')
             print('  Done!')
         else:
             local_path = os.path.join(options['prod'],
@@ -401,4 +395,3 @@ def build_pageset(pageset, options, s3=None, production=False):
             with open(os.path.join(options['prod'],
                                    page['dest']), 'w') as f:
                 f.write(final_page)
-
