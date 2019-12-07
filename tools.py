@@ -11,9 +11,8 @@ from jinja2 import Environment
 
 import sass
 import htmlmin
-import mistune 
+import mistune
 import frontmatter
-from termcolor import colored
 
 import yaml
 try:
@@ -42,7 +41,6 @@ class GlobLoader(BaseLoader):
         files = [self.concat_paths(item) for item in paths]
         self.files = list(itertools.chain.from_iterable(files))
 
-
     @classmethod
     def concat_paths(cls, paths_to_concat):
         '''
@@ -59,7 +57,6 @@ class GlobLoader(BaseLoader):
                                     negative_match)
         return list(set(positive_match) - set(negative_match))
 
-
     @staticmethod
     def append_path_to_list(path_to_append, positive_match, negative_match):
         '''
@@ -69,7 +66,6 @@ class GlobLoader(BaseLoader):
             negative_match += glob.glob(path_to_append[1:])
         else:
             positive_match += glob.glob(path_to_append)
-
 
     def get_source(self, environment, template):
         for item in self.files:
@@ -130,15 +126,17 @@ def copy_files(files_to_copy):
         file_list = GlobLoader(files_to_copy[dest_path]).files
         for file in file_list:
             print((f'Copying {os.path.basename(file)} to {dest_path}'
-                    '...'), end="")
+                   '...'),
+                  end="")
             shutil.copyfile(file, os.path.join(dest_path,
                                                os.path.basename(file)))
             print(' Done!')
 
+
 def link_static(src, dest):
     print((f'linking {src} to {dest}...'), end='')
-    subprocess.run(['ln', '-s', 
-                    os.path.expanduser(src), 
+    subprocess.run(['ln', '-s',
+                    os.path.expanduser(src),
                     os.path.expanduser(dest)])
     print(' Done!')
     
@@ -196,10 +194,10 @@ def handle_images(options):
     print(' Done!')
 
 
-
 # ###### #
 #  HTML  #
 # ###### #
+
 
 def markdown_filter(text):
     renderer = mistune.Renderer(parse_html=True)
@@ -254,7 +252,6 @@ def get_destination(page, dest):
 #     nav_pages = sorted(nav_pages, key=lambda x: x['order'])
 #     return nav_pages 
 
-
 def set_page_metadata(page
 # , index=False
     ):
@@ -297,7 +294,7 @@ def get_pages(files):
         for filename in current_filenames:
             page = get_page(filename, fileset['dest'], fileset['template'])
             pages.append(page)
-            
+
     return pages
 
 
