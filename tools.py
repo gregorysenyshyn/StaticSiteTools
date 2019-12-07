@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+#!/usr/bin/env python3 
 import os
 import glob
 import time
@@ -11,12 +10,16 @@ from jinja2 import BaseLoader
 from jinja2 import Environment
 
 import sass
-import yaml
-import boto3
 import htmlmin
 import mistune 
 import frontmatter
 from termcolor import colored
+
+import yaml
+try:
+    from yaml import CLoader as Loader, CDumper as Dumper
+except ImportError:
+    from yaml import Loader, Dumper
 
 CACHE_CONTROL_AGE=86400
 
@@ -76,17 +79,6 @@ class GlobLoader(BaseLoader):
                     return (f.read(),
                             item,
                             lambda: mtime == os.path.getmtime(item))
-
-
-def get_s3():
-    return boto3.resource('s3')
-
-
-def send_to_s3(s3, bucket, src, dest, metadata={}):
-    with open(src, 'rb') as f:
-        s3.Object(bucket, dest).put(Body=f, 
-              ContentType=metadata['ContentType'],
-              CacheControl=metadata['CacheControl'])
 
 
 def search_include_paths(target_filename, include_paths):
@@ -150,31 +142,27 @@ def link_static(src, dest):
                     os.path.expanduser(dest)])
     print(' Done!')
     
-
+def load_yaml(data):
+    with open(data) as f:
+        return yaml.load(f, Loader=Loader)
 
 # #### #
 #  JS  #
 # #### #
 
 
-def handle_js(js_paths, js_include_paths, options, s3=None, production=False):
-    for dest_path in js_paths:
-        t1 = time.time()
-        print('Generating {0}...'.format(dest_path), end="")
-        js_string = concat_files(js_paths[dest_path], js_include_paths)
-        if production:
-            print(f"Done!\nSending to S3...", end="")
-            s3.Object(options['s3 bucket'], dest_path
-                ).put(Body=js_string, 
-                      ContentType='text/javascript',
-                      CacheControl=f'max-age={CACHE_CONTROL_AGE}')
-        else:
-            os.makedirs(os.path.join(options['prod'],
-                                     os.path.split(dest_path)[0]), 
-                        exist_ok=True)
-            with open(os.path.join(options['prod'], dest_path), 'w') as f:
-                    f.write(js_string)
-        print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
+def handle_js(data, dest_path):
+    t1 = time.time()
+    print(f'{time.asctime()} — Generating {dest_path}...', end="")
+    js_string = ''
+    js_string = concat_files(data['js']['paths'][dest_path], 
+                             data['js']['search'])
+    os.makedirs(os.path.join(data['options']['dist'],
+                             os.path.split(dest_path)[0]), 
+                exist_ok=True)
+    with open(os.path.join(data['options']['dist'], dest_path), 'w') as f:
+                f.write(js_string)
+    print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
 
 
 # ###### #
@@ -182,75 +170,30 @@ def handle_js(js_paths, js_include_paths, options, s3=None, production=False):
 # ###### #
 
 
-def write_css_file(destination, scss_string, options=None, s3=None, production=False):
-    if production:
-        print(f"Done!\nSending to S3...", end="")
-        css_string = sass.compile(string=scss_string, 
-                                  output_style='compressed')
-        s3.Object(options['s3 bucket'], destination
-                ).put(Body=css_string,
-                      ContentType='text/css',
-                      CacheControl=f'max-age={CACHE_CONTROL_AGE}')
-    else:
-        with open(destination, 'w') as f:
-            f.write(sass.compile(string=scss_string))
-
-
-def handle_scss(scss_paths, scss_include_paths, options=None, s3=None, production=False):
-    for dest_path in scss_paths:
-        t1 = time.time()
-        print('Generating {0}...'.format(dest_path), end="")
-        scss_string = concat_files(scss_paths[dest_path], scss_include_paths)
-        if production: 
-            write_css_file(dest_path,
-                           scss_string,
-                           options,
-                           s3,
-                           production)
-        else:
-            os.makedirs(os.path.join(options['prod'],
-                                     os.path.split(dest_path)[0]), 
-                        exist_ok=True)
-            write_css_file(os.path.join(options['prod'],
-                                        dest_path),
-                           scss_string)
-        print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
+def handle_scss(data, dest_path):
+    t1 = time.time()
+    print(f'{time.asctime()} — Generating {dest_path}...', end="")
+    scss_string = concat_files(data['scss']['paths'][dest_path], 
+                               data['scss']['search'])
+    os.makedirs(os.path.join(data['options']['dist'],
+                             os.path.split(dest_path)[0]), 
+                exist_ok=True)
+    with open(os.path.join(data['options']['dist'], dest_path), 'w') as f:
+        f.write(sass.compile(string=scss_string))
+    print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
 
 # ######## #
 #  IMAGES  #
 # ######## #
 
-def handle_images(options, s3=None, production=None):
-    image_src = options["local_images"]
+def handle_images(options):
+    image_src = options['images']
     local_images = os.path.expanduser(image_src)
-    if production:
-        file_list = os.listdir(local_images)
-        s3_bucket = s3.Bucket(options['s3 bucket'])
-        for filename in file_list:
-            extra_args = {'CacheControl': f'max-age={CACHE_CONTROL_AGE}'}
-            if filename.endswith('.svg'):
-                extra_args['ContentType'] = 'image/svg+xml'
-            if filename.endswith('.jpg') or filename.endswith('jpeg'):
-                extra_args['ContentType'] = 'image/jpeg'
-            if filename.endswith('.png'):
-                extra_args['ContentType'] = 'image/png'
-            if filename.endswith('.gif'):
-                extra_args['ContentType'] = 'image/gif'
-            local_filename = os.path.join(local_images, filename)
-            remote_filename = os.path.join(options["remote_images"], filename)
-            if not filename.startswith('.'):
-                print(f'Copying {local_filename} to {remote_filename}...', 
-                      end='')
-                obj = s3_bucket.Object(remote_filename)
-                with open(local_filename, 'rb') as f:
-                    obj.upload_fileobj(f, ExtraArgs=extra_args)
-                print(' Done!')
-    else:
-        image_dest = options["prod"]
-        local_prod = os.path.expanduser(options["local_static"])
-        print((f'linking {local_images} to {local_prod}...'), end='')
-        subprocess.run(['ln', '-s', local_prod, image_dest])
-        print(' Done!')
+    image_dest = options['dist']
+    local_prod = os.path.expanduser(options['images'])
+    print((f'linking {local_images} to {local_prod}...'), end='')
+    subprocess.run(['ln', '-s', local_prod, image_dest])
+    print(' Done!')
 
 
 
@@ -264,69 +207,83 @@ def markdown_filter(text):
     return markdown(text)
 
 
-def get_destination(page, dest, production):
+def get_j2_env(pageset):
+    template_files = [pageset[pathset] for pathset in pageset
+                      if pathset in ['partials', 'layouts']]
+    j2_env = Environment(loader=GlobLoader(template_files), trim_blocks=True)
+    j2_env.filters['markdown'] = markdown_filter
+    return j2_env
+    
+
+def get_destination(page, dest):
     '''
     Joins dest to the last part of the path from page, and strips the
     file extension
     '''
     basename = os.path.basename(page)
-    if production:
-        final_name = os.path.splitext(basename)[0]
-    else:
-        final_name = f'{os.path.splitext(basename)[0]}.html'
+    final_name = os.path.splitext(basename)[0]
     return os.path.join(dest, final_name)
 
 
-def get_nav_pages(files, production):
-    nav_pages = []
+# def get_nav_pages(files, production):
+#     nav_pages = []
 
-    for fileset in files:
-        fileset_pages = []
-        if isinstance(fileset['src'], str):
-            fileset_pages.append(fileset['src'])
-        elif isinstance(fileset['src'], list):
-            current_pages = GlobLoader.concat_paths(fileset['src'])
-            for glob_page in current_pages:
-                fileset_pages.append(glob_page)
-        for page_name in fileset_pages:
-            page = {'src': page_name,
-                    'dest': get_destination(page_name, 
-                                            fileset['dest'],
-                                            production)}
-            set_page_metadata(page)
-            if 'order' in page['data']:
-                nav_data = {}
-                nav_data['title'] = page['data']['title']
-                nav_data['dest'] = page['dest']
-                nav_data['order'] = page['data']['order']
-                if 'subtitle' in page['data']:
-                    nav_data['subtitle'] = page['data']['subtitle']
-                nav_pages.append(nav_data)
+#     for fileset in files:
+#         fileset_pages = []
+#         if isinstance(fileset['src'], str):
+#             fileset_pages.append(fileset['src'])
+#         elif isinstance(fileset['src'], list):
+#             current_pages = GlobLoader.concat_paths(fileset['src'])
+#             for glob_page in current_pages:
+#                 fileset_pages.append(glob_page)
+#         for page_name in fileset_pages:
+#             page = {'src': page_name,
+#                     'dest': get_destination(page_name, 
+#                                             fileset['dest'],
+#                                             production)}
+#             set_page_metadata(page)
+#             if 'order' in page['data']:
+#                 nav_data = {}
+#                 nav_data['title'] = page['data']['title']
+#                 nav_data['dest'] = page['dest']
+#                 nav_data['order'] = page['data']['order']
+#                 if 'subtitle' in page['data']:
+#                     nav_data['subtitle'] = page['data']['subtitle']
+#                 nav_pages.append(nav_data)
                      
-    nav_pages = sorted(nav_pages, key=lambda x: x['order'])
-    return nav_pages 
+#     nav_pages = sorted(nav_pages, key=lambda x: x['order'])
+#     return nav_pages 
 
 
-def set_page_metadata(page, index=False):
+def set_page_metadata(page
+# , index=False
+    ):
     '''
     Sets metadata, including dest, content, data
     '''
     if page['src'].endswith('.yaml'):
         with open(page['src'], 'r') as f:
             page['data'] = yaml.load(f)
-        page['src'] = f'{page["src"][:-4]}html'
 
     elif page['src'].endswith('.md') or page['src'].endswith('.html'):
         fm_page = frontmatter.load(page['src'])
         page['data'] = fm_page.metadata
-        if not index:
-            page['content'] = fm_page.content
+        # if not index:
+        page['content'] = fm_page.content
     else:
         print(f"{page['src']} must be in either .yaml,"
-                ' .md or .html (jinja2) format!')
+               ' .md or .html (jinja2) format!')
 
 
-def get_pages(files, production):
+def get_page(src, dest, template):
+    page = ({'src': src, 
+             'dest': get_destination(src, dest),
+             'template': template})
+    set_page_metadata(page)
+    return page
+    
+
+def get_pages(files):
     '''
     Returns a list containing one or more dicts of page data
     '''
@@ -338,67 +295,52 @@ def get_pages(files, production):
         current_filenames = GlobLoader.concat_paths(fileset['src'])
 
         for filename in current_filenames:
-            page = ({'src': filename, 
-                     'dest': get_destination(filename,
-                                             fileset['dest'], 
-                                             production),
-                     'template': fileset['template']})
-
-            set_page_metadata(page)
+            page = get_page(filename, fileset['dest'], fileset['template'])
             pages.append(page)
             
     return pages
 
 
-def build_pageset(pageset, options, s3=None, production=False):
+def build_page(page, j2_env, dist):
+    # if 'site_globals' in options:
+    #     page['data']['site_globals'] = options['site_globals']
+    
+        
+    page_time = time.time()
+    print(f'{time.asctime()} — Building {page["src"]}...', end='')
+    
+    if 'content' in page:
+        final_page = j2_env.from_string(page['content']
+                        ).render(page['data'])
+    else:
+        template = j2_env.get_template(page['template'])
+        final_page = template.render(page['data']) 
+
+    # UPDATE HTML TIDY BEFORE UNCOMMENTING
+    # tidy_page, errors = tidy_document(final_page)
+    # if errors:
+    #     error_page = os.path.basename(page['src'])
+    #     with open('HTMLTidy Errors', 'a') as f:
+    #         f.write('{0}:\n{1}'.format(error_page, errors))
+    local_path = os.path.join(dist, os.path.dirname(page['dest']))
+    os.makedirs(local_path, exist_ok=True)
+    with open(os.path.join(dist, page['dest']), 'w') as f:
+        f.write(final_page)
+
+    print(f' Done writing {page["dest"]} in '
+          f'{round(float(time.time() - page_time), 4)} seconds')
+
+
+def build_pageset(pageset, options):
     '''Logic for building pages.'''
 
-    template_files = [pageset[pathset] for pathset in pageset
-                      if pathset in ['partials', 'layouts']]
-    pageset_options = pageset['options']
-    if 'nav' in pageset_options:
-        pageset_options['nav_pages'] = get_nav_pages(pageset['files'], 
-                                                     production)
+    # if 'nav' in pageset['options']:
+    #     pageset['options']['nav_pages'] = get_nav_pages(pageset['files'], 
+    #                                                  production)
 
-    j2_env = Environment(loader=GlobLoader(template_files), trim_blocks=True)
-    j2_env.filters['markdown'] = markdown_filter
-    pages = get_pages(pageset['files'], production)
+    pages = get_pages(pageset['files'])
+    j2_env = get_j2_env(pageset)
     for page in pages:
-        page['data']['production'] = production
-        if 'site_globals' in options:
-            page['data']['site_globals'] = options['site_globals']
-        if 'nav' in pageset_options:
-            page['data']['nav_pages'] = pageset_options['nav_pages']
-        page_time = time.time()
-        print(f'Building {page["src"]}...', end='')
-        if 'content' in page:
-            final_page = j2_env.from_string(page['content']
-                            ).render(page['data'])
-        else:
-            template = j2_env.get_template(page['template'])
-            final_page = template.render(page['data']) 
-
-        # UPDATE HTML TIDY BEFORE UNCOMMENTING
-        # tidy_page, errors = tidy_document(final_page)
-        # if errors:
-        #     error_page = os.path.basename(page['src'])
-        #     with open('HTMLTidy Errors', 'a') as f:
-        #         f.write('{0}:\n{1}'.format(error_page, errors))
-
-        print(f' Done writing {page["dest"]} in '
-              f'{round(float(time.time() - page_time), 4)} seconds')
-
-        if production:
-            final_page = htmlmin.minify(final_page)
-            print(f'Sending {page["dest"]} to S3...', end='')
-            s3.Object(options['s3 bucket'], page['dest']
-                    ).put(Body=final_page, ContentType='text/html')
-            print('  Done!')
-        else:
-            local_path = os.path.join(options['prod'],
-                                      os.path.dirname(page['dest']))
-            os.makedirs(local_path, exist_ok=True)
-            with open(os.path.join(options['prod'],
-                                   page['dest']), 'w') as f:
-                f.write(final_page)
-
+        if 'nav' in pageset['options']:
+            page['data']['nav_pages'] = pageset['options']['nav_pages']
+        build_page(page, j2_env, options['dist'])
