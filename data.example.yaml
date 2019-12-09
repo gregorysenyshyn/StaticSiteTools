@@ -1,38 +1,34 @@
+options:
+  dist: dist
+  images: images
+  s3_bucket: S3_BUCKET_NAME 
+
+
 js:
   paths:
-    js/mffw.js: 
-      - mffw.js
-    js/sponsors.js:
-      - sponsors.js
+    js/scripts.js:
+      - scripts.js
   search:
     - src/js/
     
     
 scss:
     paths:
-        css/style.css:
-          - style.scss
+      css/style.css:
+        - style.scss
     search:
       - src/scss/
       
       
 html:
-  - pagesets:
-    - src: 
-      - src/pages/*.html
-      - src/pages/*.md
-    - template: layout.html
-    - dest: '' 
-  - partials: 
-    - src/partials/main/*.html
-  - layouts:
-    - src/layouts/layout.html
-  - options: {}
-     
-     
-options:
-  dist: dist
-  local_static: ~/Sites/mffw/static
-  local_images: ~/Sites/mffw/static/images
-  remote_images: static/images
-  's3 bucket': mountforestfireworks.ca
+  - files:
+      - src: 
+          - src/pages/*.html
+          - src/pages/*.md
+        template: layout.html
+        dest: '' 
+    partials: 
+      - src/partials/main/*.html
+    layouts:
+      - src/layouts/layout.html
+    options: {}
