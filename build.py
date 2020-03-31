@@ -3,7 +3,7 @@
 import time
 import argparse
 
-import tools
+import StaticSiteTools.tools as tools
 
 
 def build(data):
@@ -28,7 +28,7 @@ def build(data):
 
     print('\n\n=== H T M L ===')
     t1 = time.time()
-    for pageset in data['html']['pagesets']:
+    for pageset in data['html']:
         tools.build_pageset(pageset, data['options'])
     print(f'Built all pages in {round(float(time.time() - t1), 4)} seconds')
 

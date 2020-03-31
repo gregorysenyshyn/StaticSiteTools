@@ -219,8 +219,8 @@ def get_destination(page, dest):
     file extension
     '''
     basename = os.path.basename(page)
-    final_name = os.path.splitext(basename)[0]
-    return os.path.join(dest, final_name)
+    # final_name = os.path.splitext(basename)[0]
+    return os.path.join(dest, basename)
 
 
 # def get_nav_pages(files, production):
