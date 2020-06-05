@@ -188,9 +188,8 @@ def handle_images(options):
     image_src = options['images']
     local_images = os.path.expanduser(image_src)
     image_dest = options['dist']
-    local_prod = os.path.expanduser(options['images'])
-    print((f'linking {local_images} to {local_prod}...'), end='')
-    subprocess.run(['ln', '-s', local_prod, image_dest])
+    print((f'linking {local_images} to {image_dest}...'), end='')
+    subprocess.run(['ln', '-s', local_images, image_dest])
     print(' Done!')
 
 

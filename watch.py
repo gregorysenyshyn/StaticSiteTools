@@ -53,15 +53,15 @@ class HtmlEventHandler(FileSystemEventHandler):
     def on_any_event(self, event):
         for pageset in self.data['html']:
             for pathset in pageset:
-                for fileset in pageset[pathset]:
-                    if isinstance(pageset[pathset][fileset]['src'], str):
-                        pageset[pathset][fileset]['src'] = [pageset[pathset][fileset]['src']]
-                for subpathset in pageset[pathset][fileset]['src']:
-                    if event.src_path in glob(subpathset):
+                for pathset in pageset['files']:
+                    if isinstance(pathset['src'], str):
+                        pathset['src'] = [pathset['src']]
+                for fileset in pathset['src']:
+                    if event.src_path in glob(fileset):
                         page = ({'src': event.src_path,
-                                 'template': fileset['template'],
+                                 'template': pathset['template'],
                                  'dest': tools.get_destination(event.src_path,
-                                                               fileset['dest'])})
+                                                               pathset['dest'])})
                         tools.set_page_metadata(page)
                         j2_env = tools.get_j2_env(pageset)
                         print('\n')

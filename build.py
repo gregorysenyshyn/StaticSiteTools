@@ -3,7 +3,7 @@
 import time
 import argparse
 
-import StaticSiteTools.tools as tools
+import tools
 
 
 def build(data):
