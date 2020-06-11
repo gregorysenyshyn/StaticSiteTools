@@ -23,8 +23,10 @@ class JsEventHandler(FileSystemEventHandler):
             for path in self.data['js']['paths'][dest_path]:
                 for search_path in self.data['js']['search']:
                     if event.src_path in glob(os.path.join(search_path, path)):
-                        print('\n')
-                        tools.handle_js(self.data, dest_path)
+                        try:
+                            tools.handle_js(self.data, dest_path)
+                        except:
+                            print("Error!")
                         return
 
 
@@ -40,8 +42,10 @@ class CssEventHandler(FileSystemEventHandler):
             for path in self.data['scss']['paths'][dest_path]:
                 for search_path in self.data['scss']['search']:
                     if event.src_path in glob(os.path.join(search_path, path)):
-                        print('\n')
-                        tools.handle_scss(self.data, dest_path)
+                        try:
+                            tools.handle_scss(self.data, dest_path)
+                        except CompileError:
+                            print("Compile Error!")
                         return
 
 
@@ -52,25 +56,27 @@ class HtmlEventHandler(FileSystemEventHandler):
 
     def on_any_event(self, event):
         for pageset in self.data['html']:
-            for pathset in pageset:
-                for pathset in pageset['files']:
-                    if isinstance(pathset['src'], str):
-                        pathset['src'] = [pathset['src']]
-                for fileset in pathset['src']:
-                    if event.src_path in glob(fileset):
-                        page = ({'src': event.src_path,
-                                 'template': pathset['template'],
-                                 'dest': tools.get_destination(event.src_path,
-                                                               pathset['dest'])})
-                        tools.set_page_metadata(page)
-                        j2_env = tools.get_j2_env(pageset)
-                        print('\n')
-                        tools.build_page(page, j2_env, self.data['options']['dist'])
-                        return
+            for pathset in pageset['files']:
+                if isinstance(pathset['src'], str):
+                    pathset['src'] = [pathset['src']]
+            for fileset in pathset['src']:
+                if event.src_path in glob(fileset):
+                    page = ({'src': event.src_path,
+                             'template': pathset['template'],
+                             'dest': tools.get_destination(event.src_path,
+                                                           pathset['dest'])})
+                    tools.set_page_metadata(page)
+                    j2_env = tools.get_j2_env(pageset)
+                    try:
+                        tools.build_page(page,
+                                         j2_env,
+                                         self.data['options']['dist'])
+                    except:
+                        print('Error!')
+                    return
 
 
 def watch(data):
-
     observer = Observer()
     observer.schedule(CssEventHandler(data), 'src/scss/', recursive=True)
     observer.schedule(JsEventHandler(data), 'src/js/', recursive=True)
