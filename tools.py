@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 
+#!/usr/bin/env python3
 import os
 import glob
 import time
@@ -139,7 +139,7 @@ def link_static(src, dest):
                     os.path.expanduser(src),
                     os.path.expanduser(dest)])
     print(' Done!')
-    
+
 def load_yaml(data):
     with open(data) as f:
         return yaml.load(f, Loader=Loader)
@@ -153,10 +153,10 @@ def handle_js(data, dest_path):
     t1 = time.time()
     print(f'{time.asctime()} — Generating {dest_path}...', end="")
     js_string = ''
-    js_string = concat_files(data['js']['paths'][dest_path], 
+    js_string = concat_files(data['js']['paths'][dest_path],
                              data['js']['search'])
     os.makedirs(os.path.join(data['options']['dist'],
-                             os.path.split(dest_path)[0]), 
+                             os.path.split(dest_path)[0]),
                 exist_ok=True)
     with open(os.path.join(data['options']['dist'], dest_path), 'w') as f:
                 f.write(js_string)
@@ -171,10 +171,10 @@ def handle_js(data, dest_path):
 def handle_scss(data, dest_path):
     t1 = time.time()
     print(f'{time.asctime()} — Generating {dest_path}...', end="")
-    scss_string = concat_files(data['scss']['paths'][dest_path], 
+    scss_string = concat_files(data['scss']['paths'][dest_path],
                                data['scss']['search'])
     os.makedirs(os.path.join(data['options']['dist'],
-                             os.path.split(dest_path)[0]), 
+                             os.path.split(dest_path)[0]),
                 exist_ok=True)
     with open(os.path.join(data['options']['dist'], dest_path), 'w') as f:
         f.write(sass.compile(string=scss_string))
@@ -210,7 +210,7 @@ def get_j2_env(pageset):
     j2_env = Environment(loader=GlobLoader(template_files), trim_blocks=True)
     j2_env.filters['markdown'] = markdown_filter
     return j2_env
-    
+
 
 def get_destination(page, dest):
     '''
@@ -218,42 +218,38 @@ def get_destination(page, dest):
     file extension
     '''
     basename = os.path.basename(page)
-    # final_name = os.path.splitext(basename)[0]
-    return os.path.join(dest, basename)
+    final_name = os.path.splitext(basename)[0]
+    return os.path.join(dest, f'{final_name}.html')
 
 
-# def get_nav_pages(files, production):
-#     nav_pages = []
+def get_nav_pages(files):
+    nav_pages = []
 
-#     for fileset in files:
-#         fileset_pages = []
-#         if isinstance(fileset['src'], str):
-#             fileset_pages.append(fileset['src'])
-#         elif isinstance(fileset['src'], list):
-#             current_pages = GlobLoader.concat_paths(fileset['src'])
-#             for glob_page in current_pages:
-#                 fileset_pages.append(glob_page)
-#         for page_name in fileset_pages:
-#             page = {'src': page_name,
-#                     'dest': get_destination(page_name, 
-#                                             fileset['dest'],
-#                                             production)}
-#             set_page_metadata(page)
-#             if 'order' in page['data']:
-#                 nav_data = {}
-#                 nav_data['title'] = page['data']['title']
-#                 nav_data['dest'] = page['dest']
-#                 nav_data['order'] = page['data']['order']
-#                 if 'subtitle' in page['data']:
-#                     nav_data['subtitle'] = page['data']['subtitle']
-#                 nav_pages.append(nav_data)
-                     
-#     nav_pages = sorted(nav_pages, key=lambda x: x['order'])
-#     return nav_pages 
+    for fileset in files:
+        fileset_pages = []
+        if isinstance(fileset['src'], str):
+            fileset_pages.append(fileset['src'])
+        elif isinstance(fileset['src'], list):
+            current_pages = GlobLoader.concat_paths(fileset['src'])
+            for glob_page in current_pages:
+                fileset_pages.append(glob_page)
+        for page_name in fileset_pages:
+            page = {'src': page_name,
+                    'dest': get_destination(page_name, fileset['dest'])}
+            set_page_metadata(page)
+            if 'order' in page['data']:
+                nav_data = {}
+                nav_data['title'] = page['data']['title']
+                nav_data['dest'] = page['dest']
+                nav_data['order'] = page['data']['order']
+                if 'subtitle' in page['data']:
+                    nav_data['subtitle'] = page['data']['subtitle']
+                nav_pages.append(nav_data)
 
-def set_page_metadata(page
-# , index=False
-    ):
+    nav_pages = sorted(nav_pages, key=lambda x: x['order'])
+    return nav_pages
+
+def set_page_metadata(page, index=False):
     '''
     Sets metadata, including dest, content, data
     '''
@@ -272,12 +268,12 @@ def set_page_metadata(page
 
 
 def get_page(src, dest, template):
-    page = ({'src': src, 
+    page = ({'src': src,
              'dest': get_destination(src, dest),
              'template': template})
     set_page_metadata(page)
     return page
-    
+
 
 def get_pages(files):
     '''
@@ -298,19 +294,16 @@ def get_pages(files):
 
 
 def build_page(page, j2_env, dist):
-    # if 'site_globals' in options:
-    #     page['data']['site_globals'] = options['site_globals']
-    
-        
+
     page_time = time.time()
     print(f'{time.asctime()} — Building {page["src"]}...', end='')
-    
+
     if 'content' in page:
         final_page = j2_env.from_string(page['content']
                         ).render(page['data'])
     else:
         template = j2_env.get_template(page['template'])
-        final_page = template.render(page['data']) 
+        final_page = template.render(page['data'])
 
     # UPDATE HTML TIDY BEFORE UNCOMMENTING
     # tidy_page, errors = tidy_document(final_page)
@@ -330,13 +323,14 @@ def build_page(page, j2_env, dist):
 def build_pageset(pageset, options):
     '''Logic for building pages.'''
 
-    # if 'nav' in pageset['options']:
-    #     pageset['options']['nav_pages'] = get_nav_pages(pageset['files'], 
-    #                                                  production)
+    if 'nav' in pageset['options']:
+        pageset['options']['nav_pages'] = get_nav_pages(pageset['files'])
 
     pages = get_pages(pageset['files'])
     j2_env = get_j2_env(pageset)
     for page in pages:
+        if 'site_globals' in options:
+            page['data']['site_globals'] = options['site_globals']
         if 'nav' in pageset['options']:
             page['data']['nav_pages'] = pageset['options']['nav_pages']
         build_page(page, j2_env, options['dist'])
