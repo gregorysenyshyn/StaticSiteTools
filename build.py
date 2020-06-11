@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+import os
 import time
 import argparse
+import subprocess
 
 import tools
 
@@ -34,6 +36,14 @@ def build(data):
 
     print('\n\n=== I M A G E S ===')
     tools.handle_images(data['options'])
+
+    print('\n\n=== M I S C ===')
+    print('Creating symlink for .htaccess...', end='')
+    subprocess.run(['ln', '-s',
+                    os.path.expanduser(data['options']['htaccess']),
+                    data['options']['dist']])
+    print(' Done!')
+
 
     print('\n\n=== Entire build done in',
           f'{round(float(time.time() - t0), 4)} seconds ===')
