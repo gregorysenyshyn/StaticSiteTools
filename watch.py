@@ -14,7 +14,7 @@ from watchdog.events import FileSystemEventHandler
 class JsEventHandler(FileSystemEventHandler):
 
     def __init__(self, data):
-        self.data = tools.load_yaml(data)
+        self.data = data
 
     def on_any_event(self, event):
         for dest_path in self.data['js']['paths']:
@@ -22,7 +22,10 @@ class JsEventHandler(FileSystemEventHandler):
                 self.data['js']['paths'][dest_path] = [self.data['js']['paths'][dest_path]]
             for path in self.data['js']['paths'][dest_path]:
                 for search_path in self.data['js']['search']:
-                    if event.src_path in glob(os.path.join(search_path, path)):
+                    if event.src_path in glob(os.path.join(
+                        os.path.expanduser(self.data['options']['basedir']),
+                        search_path,
+                        path)):
                         try:
                             tools.handle_js(self.data, dest_path)
                         except:
@@ -33,7 +36,7 @@ class JsEventHandler(FileSystemEventHandler):
 class CssEventHandler(FileSystemEventHandler):
 
     def __init__(self, data):
-        self.data = tools.load_yaml(data)
+        self.data = data
 
     def on_any_event(self, event):
         for dest_path in self.data['scss']['paths']:
@@ -41,7 +44,10 @@ class CssEventHandler(FileSystemEventHandler):
                 self.data['scss']['paths'][dest_path] = [self.data['scss']['paths'][dest_path]]
             for path in self.data['scss']['paths'][dest_path]:
                 for search_path in self.data['scss']['search']:
-                    if event.src_path in glob(os.path.join(search_path, path)):
+                    if event.src_path in glob(os.path.join(
+                        os.path.expanduser(self.data['options']['basedir']),
+                        search_path,
+                        path)):
                         try:
                             tools.handle_scss(self.data, dest_path)
                         except CompileError:
@@ -52,35 +58,47 @@ class CssEventHandler(FileSystemEventHandler):
 class HtmlEventHandler(FileSystemEventHandler):
 
     def __init__(self, data):
-        self.data = tools.load_yaml(data)
+        self.data = data
 
     def on_any_event(self, event):
         for pageset in self.data['html']:
             for pathset in pageset['files']:
                 if isinstance(pathset['src'], str):
                     pathset['src'] = [pathset['src']]
-            for fileset in pathset['src']:
-                if event.src_path in glob(fileset):
-                    page = ({'src': event.src_path,
-                             'template': pathset['template'],
-                             'dest': tools.get_destination(event.src_path,
-                                                           pathset['dest'])})
-                    tools.set_page_metadata(page)
-                    j2_env = tools.get_j2_env(pageset)
-                    try:
-                        tools.build_page(page,
-                                         j2_env,
-                                         self.data['options']['dist'])
-                    except:
-                        print('Error!')
-                    return
+                for fileset in pathset['src']:
+                    if event.src_path in glob(os.path.join(
+                            os.path.expanduser(self.data['options']['basedir']),
+                            fileset)):
+                        page = ({'src': event.src_path,
+                                 'template': pathset['template'],
+                                 'dest': tools.get_destination(event.src_path,
+                                                               pathset['dest'])})
+                        tools.set_page_metadata(page)
+                        import pdb; pdb.set_trace()
+                        if 'nav' in pageset['options']:
+                            page['data']['nav_pages'] = tools.get_nav_pages(pageset['files'])
+                        j2_env = tools.get_j2_env(pageset)
+                        try:
+                            tools.build_page(page,
+                                             j2_env,
+                                             self.data['options'])
+                        except Exception as e:
+                            print(f'Error! {e}')
+                        return
 
 
 def watch(data):
+    data = tools.load_yaml(data)
     observer = Observer()
-    observer.schedule(CssEventHandler(data), 'src/scss/', recursive=True)
-    observer.schedule(JsEventHandler(data), 'src/js/', recursive=True)
-    observer.schedule(HtmlEventHandler(data), 'src/pages/', recursive=True)
+    observer.schedule(CssEventHandler(data),
+                      os.path.join(os.path.expanduser(data['options']['basedir']), 'src/scss/'),
+                      recursive=True)
+    observer.schedule(JsEventHandler(data),
+                      os.path.join(os.path.expanduser(data['options']['basedir']), 'src/js/'),
+                      recursive=True)
+    observer.schedule(HtmlEventHandler(data),
+                      os.path.join(os.path.expanduser(data['options']['basedir']), 'src/pages/'),
+                      recursive=True)
     observer.start()
     try:
         while True:

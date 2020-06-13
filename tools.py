@@ -293,11 +293,13 @@ def get_pages(files):
     return pages
 
 
-def build_page(page, j2_env, dist):
+def build_page(page, j2_env, options):
 
     page_time = time.time()
     print(f'{time.asctime()} — Building {page["src"]}...', end='')
 
+    if 'site_globals' in options:
+        page['data']['site_globals'] = options['site_globals']
     if 'content' in page:
         final_page = j2_env.from_string(page['content']
                         ).render(page['data'])
@@ -305,15 +307,9 @@ def build_page(page, j2_env, dist):
         template = j2_env.get_template(page['template'])
         final_page = template.render(page['data'])
 
-    # UPDATE HTML TIDY BEFORE UNCOMMENTING
-    # tidy_page, errors = tidy_document(final_page)
-    # if errors:
-    #     error_page = os.path.basename(page['src'])
-    #     with open('HTMLTidy Errors', 'a') as f:
-    #         f.write('{0}:\n{1}'.format(error_page, errors))
-    local_path = os.path.join(dist, os.path.dirname(page['dest']))
+    local_path = os.path.join(options['dist'], os.path.dirname(page['dest']))
     os.makedirs(local_path, exist_ok=True)
-    with open(os.path.join(dist, page['dest']), 'w') as f:
+    with open(os.path.join(options['dist'], page['dest']), 'w') as f:
         f.write(final_page)
 
     print(f' Done writing {page["dest"]} in '
@@ -323,14 +319,12 @@ def build_page(page, j2_env, dist):
 def build_pageset(pageset, options):
     '''Logic for building pages.'''
 
-    if 'nav' in pageset['options']:
-        pageset['options']['nav_pages'] = get_nav_pages(pageset['files'])
+    if pageset['options']['nav']:
+        nav_pages = get_nav_pages(pageset['files'])
 
     pages = get_pages(pageset['files'])
     j2_env = get_j2_env(pageset)
     for page in pages:
-        if 'site_globals' in options:
-            page['data']['site_globals'] = options['site_globals']
         if 'nav' in pageset['options']:
-            page['data']['nav_pages'] = pageset['options']['nav_pages']
-        build_page(page, j2_env, options['dist'])
+            page['data']['nav_pages'] = nav_pages
+        build_page(page, j2_env, options)
