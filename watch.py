@@ -74,7 +74,6 @@ class HtmlEventHandler(FileSystemEventHandler):
                                  'dest': tools.get_destination(event.src_path,
                                                                pathset['dest'])})
                         tools.set_page_metadata(page)
-                        import pdb; pdb.set_trace()
                         if 'nav' in pageset['options']:
                             page['data']['nav_pages'] = tools.get_nav_pages(pageset['files'])
                         j2_env = tools.get_j2_env(pageset)
