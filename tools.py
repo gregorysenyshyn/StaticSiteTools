@@ -319,7 +319,7 @@ def build_page(page, j2_env, options):
 def build_pageset(pageset, options):
     '''Logic for building pages.'''
 
-    if pageset['options']['nav']:
+    if 'nav' in pageset['options']:
         nav_pages = get_nav_pages(pageset['files'])
 
     pages = get_pages(pageset['files'])

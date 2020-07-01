@@ -40,7 +40,8 @@ def build(data):
     print('\n\n=== M I S C ===')
     print('Creating symlink for .htaccess...', end='')
     subprocess.run(['ln', '-s',
-                    os.path.join(os.path.expanduser(data['options']['basdir']),
+                    os.path.join(os.path.expanduser(
+                        data['options']['basedir']),
                     data['options']['htaccess']),
                     data['options']['dist']])
     print(' Done!')
