@@ -185,8 +185,8 @@ def handle_scss(data, dest_path):
 # ######## #
 
 def handle_images(options):
-    image_src = options['images']
-    local_images = os.path.expanduser(image_src)
+    local_images = os.path.join(os.path.expanduser(options['basedir']),
+                                options['images'])
     image_dest = options['dist']
     print((f'linking {local_images} to {image_dest}...'), end='')
     subprocess.run(['ln', '-s', local_images, image_dest])
@@ -212,14 +212,17 @@ def get_j2_env(pageset):
     return j2_env
 
 
-def get_destination(page, dest):
+def get_destination(page, dest, options):
     '''
     Joins dest to the last part of the path from page, and strips the
     file extension
     '''
     basename = os.path.basename(page)
     final_name = os.path.splitext(basename)[0]
-    return os.path.join(dest, f'{final_name}.html')
+    if 'production' in options:
+        return os.path.join(dest, final_name)
+    else:
+        return os.path.join(dest, f'{final_name}.html')
 
 
 def get_nav_pages(files):
@@ -267,15 +270,15 @@ def set_page_metadata(page, index=False):
                ' .md or .html (jinja2) format!')
 
 
-def get_page(src, dest, template):
+def get_page(src, dest, template, options):
     page = ({'src': src,
-             'dest': get_destination(src, dest),
+             'dest': get_destination(src, dest, options),
              'template': template})
     set_page_metadata(page)
     return page
 
 
-def get_pages(files):
+def get_pages(files, options):
     '''
     Returns a list containing one or more dicts of page data
     '''
@@ -287,7 +290,10 @@ def get_pages(files):
         current_filenames = GlobLoader.concat_paths(fileset['src'])
 
         for filename in current_filenames:
-            page = get_page(filename, fileset['dest'], fileset['template'])
+            page = get_page(filename,
+                            fileset['dest'],
+                            fileset['template'],
+                            options)
             pages.append(page)
 
     return pages
@@ -309,6 +315,7 @@ def build_page(page, j2_env, options):
 
     local_path = os.path.join(options['dist'], os.path.dirname(page['dest']))
     os.makedirs(local_path, exist_ok=True)
+
     with open(os.path.join(options['dist'], page['dest']), 'w') as f:
         f.write(final_page)
 
@@ -322,7 +329,7 @@ def build_pageset(pageset, options):
     if 'nav' in pageset['options']:
         nav_pages = get_nav_pages(pageset['files'])
 
-    pages = get_pages(pageset['files'])
+    pages = get_pages(pageset['files'], options)
     j2_env = get_j2_env(pageset)
     for page in pages:
         if 'nav' in pageset['options']:
