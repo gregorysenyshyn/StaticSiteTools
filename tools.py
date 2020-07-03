@@ -20,8 +20,7 @@ try:
 except ImportError:
     from yaml import Loader, Dumper
 
-CACHE_CONTROL_AGE=86400
-
+import s3
 
 # ####### #
 #  UTILS  #
@@ -212,17 +211,14 @@ def get_j2_env(pageset):
     return j2_env
 
 
-def get_destination(page, dest, options):
+def get_destination(page, dest):
     '''
     Joins dest to the last part of the path from page, and strips the
     file extension
     '''
     basename = os.path.basename(page)
     final_name = os.path.splitext(basename)[0]
-    if 'production' in options:
-        return os.path.join(dest, final_name)
-    else:
-        return os.path.join(dest, f'{final_name}.html')
+    return os.path.join(dest, f'{final_name}.html')
 
 
 def get_nav_pages(files):
@@ -270,9 +266,9 @@ def set_page_metadata(page, index=False):
                ' .md or .html (jinja2) format!')
 
 
-def get_page(src, dest, template, options):
+def get_page(src, dest, template):
     page = ({'src': src,
-             'dest': get_destination(src, dest, options),
+             'dest': get_destination(src, dest),
              'template': template})
     set_page_metadata(page)
     return page
@@ -292,8 +288,7 @@ def get_pages(files, options):
         for filename in current_filenames:
             page = get_page(filename,
                             fileset['dest'],
-                            fileset['template'],
-                            options)
+                            fileset['template'])
             pages.append(page)
 
     return pages
@@ -318,9 +313,11 @@ def build_page(page, j2_env, options):
 
     with open(os.path.join(options['dist'], page['dest']), 'w') as f:
         f.write(final_page)
-
     print(f' Done writing {page["dest"]} in '
           f'{round(float(time.time() - page_time), 4)} seconds')
+
+    if 'production' in options:
+        s3.send_it(options)
 
 
 def build_pageset(pageset, options):

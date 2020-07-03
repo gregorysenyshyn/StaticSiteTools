@@ -8,37 +8,34 @@ import boto3
 from botocore.exceptions import ClientError
 
 
-CACHE_CONTROL_AGE = '604800'  # 1 week
-PROFILE_NAME = 'mffw'
-
-
-def handle_page(filename, destname):
-    client = get_client('s3')
-    extra_args = {'CacheControl': f'max-age={CACHE_CONTROL_AGE}',
+def handle_page(filename, destname, options, client=None):
+    if client == None:
+        client = get_client(options, 's3')
+    extra_args = {'CacheControl': f'max-age={options["cache_control_age"]}',
                   'ContentType': 'text/html'}
-    upload_file(filename, client, DATA['options']['bucket'],
-                destname, extra_args)
+    upload_file(filename, destname, extra_args, options, client)
 
 
-def handle_css(filename, destname):
-    client = get_client('s3')
-    extra_args = {'CacheControl': f'max-age={CACHE_CONTROL_AGE}',
+def handle_css(filename, destname, options, client=None):
+    if client == None:
+        client = get_client(options, 's3')
+    extra_args = {'CacheControl': f'max-age={options["cache_control_age"]}',
                   'ContentType': 'text/css'}
-    upload_file(filename, client, DATA['options']['bucket'],
-                destname, extra_args)
+    upload_file(filename, destname, extra_args, options, client)
 
 
-def handle_js(filename, destname):
-    client = get_client('s3')
-    extra_args = {'CacheControl': f'max-age={CACHE_CONTROL_AGE}',
+def handle_js(filename, destname, options, client=None):
+    if client == None:
+        client = get_client(options, 's3')
+    extra_args = {'CacheControl': f'max-age={options["cache_control_age"]}',
                   'ContentType': 'text/javascript'}
-    upload_file(filename, client, DATA['options']['bucket'],
-                destname, extra_args)
+    upload_file(filename, destname, extra_args, options, client)
 
 
-def handle_image(filename, destname):
-    client = get_client('s3')
-    extra_args = {'CacheControl': f'max-age={CACHE_CONTROL_AGE}'}
+def handle_image(filename, destname, options, client=None):
+    if client == None:
+        client = get_client(options, 's3')
+    extra_args = {'CacheControl': f'max-age={options["cache_control_age"]}'}
     if filename.endswith('.svg'):
         extra_args['ContentType'] = 'image/svg+xml'
     elif filename.endswith('.jpg') or filename.endswith('jpeg'):
@@ -47,12 +44,11 @@ def handle_image(filename, destname):
         extra_args['ContentType'] = 'image/png'
     elif filename.endswith('.gif'):
         extra_args['ContentType'] = 'image/gif'
-    upload_file(filename, client, DATA['options']['bucket'],
-                destname, extra_args)
+    upload_file(filename, destname, extra_args, options, client)
 
 
 def get_cloudfront_config(client, endpoint):
-    client = get_client('cloudfront')
+    client = get_client(options, 'cloudfront')
     response = client.create_distribution(
         DistributionConfig={
             'CallerReference': datetime.now(),
@@ -274,16 +270,16 @@ def get_cloudfront_config(client, endpoint):
     )
 
 
-def create_cdn_distribution():
-    client = get_client('s3')
-    response = client.get_bucket_location(Bucket=DATA['options']['bucket'])
+def create_cdn_distribution(options):
+    client = get_client(options, 's3')
+    response = client.get_bucket_location(Bucket=options['s3_bucket'])
     zone = response['LocationConstraint']
-    endpoint = f'{DATA["options"]["bucket"]}.s3-website.{zone}.amazonaws.com'
+    endpoint = f'{options["s3_bucket"]}.s3-website.{zone}.amazonaws.com'
     print(endpoint)
 
 
 def get_cdn_distribution():
-    client = get_client('cloudfront')
+    client = get_client(options, 'cloudfront')
     response = client.list_distributions()
     if response['DistributionList']['Quantity'] == 0:
         print('No distributions found! Create one? (y/n) ', end='')
@@ -294,7 +290,7 @@ def get_cdn_distribution():
             print('No distribution for website')
 
 
-def get_bucket_policy():
+def get_bucket_policy(options):
     bucket_policy = {
         'Version': '2012-10-17',
         'Statement': [{
@@ -302,35 +298,36 @@ def get_bucket_policy():
             'Effect': 'Allow',
             'Principal': '*',
             'Action': ['s3:GetObject'],
-            f'Resource': f'arn:aws:s3:::{DATA["options"]["bucket"]}/*'
+            f'Resource': f'arn:aws:s3:::{options["s3_bucket"]}/*'
         }]
     }
     return json.dumps(bucket_policy)
 
 
-def check_bucket_policy():
-    client = get_client('s3')
+def check_bucket_policy(options, client=None):
+    if client == None:
+        client = get_client(options, 's3')
     print('\nChecking Bucket Policy')
     response = client.get_bucket_policy_status(
-                Bucket=DATA['options']['bucket'])
+                Bucket=DATA['options']['s3_bucket'])
     if response['PolicyStatus']['IsPublic']:
-        print(f'{DATA["options"]["bucket"]} is public')
+        print(f'{DATA["options"]["s3_bucket"]} is public')
     else:
-        print(f'{DATA["options"]["bucket"]} is NOT public')
+        print(f'{DATA["options"]["s3_bucket"]} is NOT public')
         response = client.get_bucket_policy(
-                  Bucket=DATA['options']['bucket'])
+                  Bucket=DATA['options']['s3_bucket'])
         print(f'Policy:\n{response["Policy"]}')
         new_policy = input('Reset bucket policy? (y/n) ', end='')
         if new_policy == 'y':
-            client.put_bucket_policy(Bucket=DATA['options']['bucket'],
+            client.put_bucket_policy(Bucket=DATA['options']['s3_bucket'],
                                      Policy=get_bucket_policy())
 
 
 def set_up_website(index_name='index', error_name='error'):
-    client = get_client('s3')
+    client = get_client(options, 's3')
     print('Setting up website... ', end='')
     client.put_bucket_website(
-        Bucket=DATA['options']['bucket'],
+        Bucket=DATA['options']['s3_bucket'],
         WebsiteConfiguration={
             'IndexDocument': {'Suffix': index_name},
             'ErrorDocument': {'Key': error_name}
@@ -338,27 +335,31 @@ def set_up_website(index_name='index', error_name='error'):
     print(f'Done!\nIndex set to {index_name}\nError set to {error_name}')
 
 
-def check_index_and_error_pages(response):
-    dist_files = os.listdir(DATA['options']['dist'])
+def check_index_and_error_pages(response, options):
+    dist_files = os.listdir(options['dist'])
 
     index_document = response["IndexDocument"]["Suffix"]
-    print(f'Index Document: {index_document}: ', end='')
+    print(f'Index Document "{index_document}": ', end='')
     if f'{index_document}.html' in dist_files:
         print('Exists!')
     else:
         print("Doesn't Exist!")
 
-    error_document = response["ErrorDocument"]["Key"]
-    print(f'Error Document: {error_document}: ', end='')
-    if f'{error_document}.html' in dist_files:
-        print('Exists!')
-    else:
-        print("Doesn't Exist!")
+    try:
+        error_document = response["ErrorDocument"]["Key"]
+        print(f'Error Document "{error_document}": ', end='')
+        if f'{error_document}.html' in dist_files:
+            print('Exists!')
+        else:
+            print("Doesn't Exist!")
+    except KeyError as e:
+        print(repr(e))
 
 
-def confirm_website_settings():
-    client = get_client('s3')
-    bucket = DATA['options']['bucket']
+def confirm_website_settings(options, client=None):
+    if client == None:
+        client = get_client(options, 's3')
+    bucket = options['s3_bucket']
     try:
         response = client.get_bucket_website(Bucket=bucket)
     except ClientError:
@@ -367,53 +368,61 @@ def confirm_website_settings():
         if answer == 'y':
             set_up_website(client, bucket)
     else:
-        check_index_and_error_pages(response)
+        check_index_and_error_pages(response, options)
 
 
-def upload_file(filename, destname, extra_args):
-    client = get_client('s3')
-    print(f'Copying {filename} to {DATA["options"]["bucket"]}/{destname}...',
+def upload_file(filename, destname, extra_args, options, client=None):
+    client = get_client(options, 's3')
+    print(f'Copying {filename} to {options["s3_bucket"]}/{destname}...',
           end='')
     with open(filename, 'rb') as f:
         client.upload_fileobj(f,
-                              DATA['options']['bucket'],
+                              options['s3_bucket'],
                               destname,
                               ExtraArgs=extra_args)
     print(' Done!')
 
 
-def send_it(options):
-    client = get_client('s3')
+def send_it(options, client=None):
+    if client == None:
+        client = get_client(options, 's3')
     for filename in glob.glob(f'{options["dist"]}/**', recursive=True):
         if not filename.startswith('.'):
             if not os.path.isdir(filename):
                 destname = filename[len(options['dist'])+1:]
                 if destname.endswith('.html'):
                     destname = destname[:-5]
-                    handle_page(filename, client, destname, options['bucket'])
-                elif destname.startswith('js/'):
-                    handle_js(filename, client, destname, options['bucket'])
-                elif destname.startswith('css/'):
-                    handle_css(filename, client, destname, options['bucket'])
+                    handle_page(filename, destname, options, client)
+                elif destname.startswith('js/') and destname.endswith('.js'):
+                    handle_js(filename, destname, options, client)
+                elif destname.startswith('css/') and destname.endswith('.css'):
+                    handle_css(filename, destname, options, client)
                 elif destname.startswith('images/'):
-                    handle_image(filename, client, destname, options['bucket'])
+                    pass
+                #subprocess.run(['aws', 's3', 'sync',
+                #    ##TODO os.path.join?
+                #               options['dist'],
+                #               f's3://{options["s3_bucket"]}',
+                #               '--delete'])
         else:
             print(f'ERROR - Not uploading hidden file {filename}')
 
 
-def clean():
-    client = get_client('s3')
-    response = client.list_objects(Bucket=DATA['options']['bucket'])
+def clean(options, images=False, client=None):
+    if client == None:
+        client = get_client(options, 's3')
+    response = client.list_objects(Bucket=options['s3_bucket'])
     if 'Contents' in response:
         for item in response['Contents']:
-            print(f'removing {item["Key"]}... ', end='')
-            client.delete_object(Bucket=DATA['options']['bucket'],
-                                 Key=item['Key'])
-            print(' Done!')
+            if not item['Key'].startswith(options['images']) or images == True:
+                print(f'removing {item["Key"]}... ', end='')
+                client.delete_object(Bucket=options['s3_bucket'],
+                                     Key=item['Key'])
+                print(' Done!')
 
 
-def get_client(client_type):
-    session = boto3.Session(profile_name=PROFILE_NAME)
+def get_client(options, client_type):
+    session = boto3.Session(profile_name=options['aws_profile_name'])
     client = session.client(client_type)
     return client
 
@@ -425,24 +434,25 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', help='YAML data file', required=True)
     parser.add_argument('--clean',
-                        help=('Clean AWS Bucket (including images)'
+                        help=('Clean AWS Bucket (excluding images)'
                               ' before uploading'),
                         action='store_true')
     args = parser.parse_args()
-    DATA = tools.load_yaml(args.data)
+    data = tools.load_yaml(args.data)
 
-    # print('\n#####\nWebsite Settings:')
-    # confirm_website_settings(CLIENT, DATA['options']['bucket'])
-    # check_bucket_policy(CLIENT)
-    # print('\n#####')
+    s3_client = get_client(data['options'], 's3')
 
-    get_cdn_distribution()
+    if args.clean:
+        print(f'\n\n#####\nCleaning s3://{data["options"]["s3_bucket"]}...')
+        clean(data['options'], client=s3_client)
+        print('All Clean!\n\n')
 
-    # if args.clean:
-    #     print(f'#####\nCleaning {DATA["options"]["bucket"]}...', end='')
-    #     clean(DATA['options']['bucket'], CLIENT)
-    #     print('Done!')
+    print((f'#####\nUploading {data["options"]["dist"]}'),
+          (f'to {data["options"]["s3_bucket"]}...'))
+    send_it(data['options'])
 
-    # print((f'Uploading {DATA["options"]["dist"]}'),
-    #       (f'to {DATA["options"]["bucket"]}...'))
-    # send_it(DATA['options'])
+    print('\n#####\nWebsite Settings:')
+    confirm_website_settings(data['options'], s3_client)
+    check_bucket_policy(options, s3_client)
+    print('\n#####')
+    # get_cdn_distribution()

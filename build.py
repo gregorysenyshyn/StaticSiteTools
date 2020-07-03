@@ -8,15 +8,12 @@ import subprocess
 import tools
 
 
-def build(data, production=False):
+def build(data):
 
     print('\nStarting build!')
     t0 = time.time()
 
     data = tools.load_yaml(data)
-
-    if production:
-        data['options']['production'] = True
 
     print('\n\n=== C L E A N ===')
     print(f'cleaning {data["options"]["dist"]}...', end='')
@@ -40,15 +37,14 @@ def build(data, production=False):
     print('\n\n=== I M A G E S ===')
     tools.handle_images(data['options'])
 
-    if not production:
-        print('\n\n=== M I S C ===')
-        print('Creating symlink for .htaccess...', end='')
-        subprocess.run(['ln', '-s',
-                        os.path.join(os.path.expanduser(
-                            data['options']['basedir']),
-                        data['options']['htaccess']),
-                        data['options']['dist']])
-        print(' Done!')
+    print('\n\n=== M I S C ===')
+    print('Creating symlink for .htaccess...', end='')
+    subprocess.run(['ln', '-s',
+                    os.path.join(os.path.expanduser(
+                        data['options']['basedir']),
+                    data['options']['htaccess']),
+                    data['options']['dist']])
+    print(' Done!')
 
 
     print('\n\n=== Entire build done in',
@@ -59,11 +55,5 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', help='YAML data file')
-    parser.add_argument('--production',
-                        help='Production mode',
-                        action='store_true')
     args = parser.parse_args()
-    if args.production:
-        build(args.data, production=True)
-    else:
-        build(args.data)
+    build(args.data)
