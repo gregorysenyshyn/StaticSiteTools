@@ -40,12 +40,10 @@ def build(data):
     print('\n\n=== M I S C ===')
     print('Creating symlink for .htaccess...', end='')
     subprocess.run(['ln', '-s',
-                    os.path.join(os.path.expanduser(
-                        data['options']['basedir']),
-                    data['options']['htaccess']),
+                    os.path.join(os.getcwd(),
+                                 data['options']['htaccess']),
                     data['options']['dist']])
     print(' Done!')
-
 
     print('\n\n=== Entire build done in',
           f'{round(float(time.time() - t0), 4)} seconds ===')

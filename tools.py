@@ -184,7 +184,7 @@ def handle_scss(data, dest_path):
 # ######## #
 
 def handle_images(options):
-    local_images = os.path.join(os.path.expanduser(options['basedir']),
+    local_images = os.path.join(os.getcwd(),
                                 options['images'])
     image_dest = options['dist']
     print((f'linking {local_images} to {image_dest}...'), end='')
