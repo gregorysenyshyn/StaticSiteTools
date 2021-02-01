@@ -10,17 +10,14 @@ from jinja2 import BaseLoader
 from jinja2 import Environment
 
 import sass
-import htmlmin
 import mistune
 import frontmatter
 
 import yaml
 try:
-    from yaml import CLoader as Loader, CDumper as Dumper
+    from yaml import CLoader as Loader
 except ImportError:
-    from yaml import Loader, Dumper
-
-import s3
+    from yaml import Loader
 
 # ####### #
 #  UTILS  #
@@ -139,6 +136,7 @@ def link_static(src, dest):
                     os.path.expanduser(dest)])
     print(' Done!')
 
+
 def load_yaml(data):
     with open(data) as f:
         return yaml.load(f, Loader=Loader)
@@ -158,7 +156,7 @@ def handle_js(data, dest_path):
                              os.path.split(dest_path)[0]),
                 exist_ok=True)
     with open(os.path.join(data['options']['dist'], dest_path), 'w') as f:
-                f.write(js_string)
+        f.write(js_string)
     print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
 
 
@@ -182,6 +180,7 @@ def handle_scss(data, dest_path):
 # ######## #
 #  IMAGES  #
 # ######## #
+
 
 def handle_images(options):
     local_images = os.path.join(os.getcwd(),
@@ -211,17 +210,19 @@ def get_j2_env(pageset):
     return j2_env
 
 
-def get_destination(page, dest):
+def get_destination(page, dest, options=None):
     '''
-    Joins dest to the last part of the path from page, and strips the
-    file extension
+    Joins dest to the name of the page, and replaces file extension with .html
     '''
     basename = os.path.basename(page)
     final_name = os.path.splitext(basename)[0]
-    return os.path.join(dest, f'{final_name}.html')
+    if options is not None and options['production']:
+        return os.path.join(dest, f'{final_name}')
+    else:
+        return os.path.join(dest, f'{final_name}.html')
 
 
-def get_nav_pages(files):
+def get_nav_pages(files, options):
     nav_pages = []
 
     for fileset in files:
@@ -232,9 +233,12 @@ def get_nav_pages(files):
             current_pages = GlobLoader.concat_paths(fileset['src'])
             for glob_page in current_pages:
                 fileset_pages.append(glob_page)
+
         for page_name in fileset_pages:
             page = {'src': page_name,
-                    'dest': get_destination(page_name, fileset['dest'])}
+                    'dest': get_destination(page_name,
+                                            fileset['dest'],
+                                            options)}
             set_page_metadata(page)
             if 'order' in page['data']:
                 nav_data = {}
@@ -247,6 +251,7 @@ def get_nav_pages(files):
 
     nav_pages = sorted(nav_pages, key=lambda x: x['order'])
     return nav_pages
+
 
 def set_page_metadata(page, index=False):
     '''
@@ -263,7 +268,7 @@ def set_page_metadata(page, index=False):
         page['content'] = fm_page.content
     else:
         print(f"{page['src']} must be in either .yaml,"
-               ' .md or .html (jinja2) format!')
+              ' .md or .html (jinja2) format!')
 
 
 def get_page(src, dest, template):
@@ -299,11 +304,8 @@ def build_page(page, j2_env, options):
     page_time = time.time()
     print(f'{time.asctime()} — Building {page["src"]}...', end='')
 
-    if 'site_globals' in options:
-        page['data']['site_globals'] = options['site_globals']
     if 'content' in page:
-        final_page = j2_env.from_string(page['content']
-                        ).render(page['data'])
+        final_page = j2_env.from_string(page['content']).render(page['data'])
     else:
         template = j2_env.get_template(page['template'])
         final_page = template.render(page['data'])
@@ -316,19 +318,18 @@ def build_page(page, j2_env, options):
     print(f' Done writing {page["dest"]} in '
           f'{round(float(time.time() - page_time), 4)} seconds')
 
-    if 'production' in options:
-        s3.send_it(options)
-
 
 def build_pageset(pageset, options):
     '''Logic for building pages.'''
 
     if 'nav' in pageset['options']:
-        nav_pages = get_nav_pages(pageset['files'])
+        nav_pages = get_nav_pages(pageset['files'], options)
 
     pages = get_pages(pageset['files'], options)
     j2_env = get_j2_env(pageset)
     for page in pages:
+        if options['production']:
+            page['data']['production'] = True
         if 'nav' in pageset['options']:
             page['data']['nav_pages'] = nav_pages
         build_page(page, j2_env, options)

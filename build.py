@@ -13,8 +13,6 @@ def build(data):
     print('\nStarting build!')
     t0 = time.time()
 
-    data = tools.load_yaml(data)
-
     print('\n\n=== C L E A N ===')
     print(f'cleaning {data["options"]["dist"]}...', end='')
     tools.clean(data['options']['dist'])
@@ -53,5 +51,11 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', help='YAML data file')
+    parser.add_argument('--production',
+                        action='store_true',
+                        help='Include analytics, etc.')
     args = parser.parse_args()
-    build(args.data)
+    data = tools.load_yaml(args.data)
+    if args.production:
+        data['options']['production'] = True
+    build(data)
