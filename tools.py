@@ -191,6 +191,20 @@ def handle_images(options):
     print(' Done!')
 
 
+# ######### #
+#   AUDIO   #
+# ######### #
+
+
+def handle_audio(options):
+    local_images = os.path.join(os.getcwd(),
+                                options['audio'])
+    image_dest = options['dist']
+    print((f'linking {local_images} to {image_dest}...'), end='')
+    subprocess.run(['ln', '-s', local_images, image_dest])
+    print(' Done!')
+
+
 # ###### #
 #  HTML  #
 # ###### #
@@ -210,13 +224,13 @@ def get_j2_env(pageset):
     return j2_env
 
 
-def get_destination(page, dest, options=None):
+def get_destination(page, dest, file_ext=True):
     '''
     Joins dest to the name of the page, and replaces file extension with .html
     '''
     basename = os.path.basename(page)
     final_name = os.path.splitext(basename)[0]
-    if options is not None and options['production']:
+    if not file_ext:
         return os.path.join(dest, f'{final_name}')
     else:
         return os.path.join(dest, f'{final_name}.html')
@@ -233,12 +247,9 @@ def get_nav_pages(files, options):
             current_pages = GlobLoader.concat_paths(fileset['src'])
             for glob_page in current_pages:
                 fileset_pages.append(glob_page)
-
         for page_name in fileset_pages:
             page = {'src': page_name,
-                    'dest': get_destination(page_name,
-                                            fileset['dest'],
-                                            options)}
+                    'dest': get_destination(page_name, fileset['dest'], False)}
             set_page_metadata(page)
             if 'order' in page['data']:
                 nav_data = {}
@@ -328,7 +339,7 @@ def build_pageset(pageset, options):
     pages = get_pages(pageset['files'], options)
     j2_env = get_j2_env(pageset)
     for page in pages:
-        if options['production']:
+        if 'production' in options and options['production']:
             page['data']['production'] = True
         if 'nav' in pageset['options']:
             page['data']['nav_pages'] = nav_pages

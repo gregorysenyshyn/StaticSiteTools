@@ -35,6 +35,9 @@ def build(data):
     print('\n\n=== I M A G E S ===')
     tools.handle_images(data['options'])
 
+    print('\n\n=== A U D I O ===')
+    tools.handle_audio(data['options'])
+
     print('\n\n=== M I S C ===')
     print('Creating symlink for .htaccess...', end='')
     subprocess.run(['ln', '-s',
