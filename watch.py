@@ -16,7 +16,7 @@ class JsEventHandler(FileSystemEventHandler):
     def __init__(self, data):
         self.data = data
 
-    def on_any_event(self, event):
+    def on_modified(self, event):
         for dest_path in self.data['js']['paths']:
             if isinstance(self.data['js']['paths'][dest_path], str):
                 self.data['js']['paths'][dest_path] = [
@@ -37,7 +37,7 @@ class CssEventHandler(FileSystemEventHandler):
     def __init__(self, data):
         self.data = data
 
-    def on_any_event(self, event):
+    def on_modified(self, event):
         for dest_path in self.data['scss']['paths']:
             if isinstance(self.data['scss']['paths'][dest_path], str):
                 self.data['scss']['paths'][dest_path] = [
@@ -58,7 +58,7 @@ class HtmlEventHandler(FileSystemEventHandler):
     def __init__(self, data):
         self.data = data
 
-    def on_any_event(self, event):
+    def on_modified(self, event):
         for pageset in self.data['html']:
             for pathset in pageset['files']:
                 if isinstance(pathset['src'], str):
