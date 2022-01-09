@@ -211,8 +211,7 @@ def handle_audio(options):
 
 
 def markdown_filter(text):
-    renderer = mistune.Renderer(parse_html=True)
-    markdown = mistune.Markdown(renderer=renderer)
+    markdown = mistune.create_markdown()
     return markdown(text)
 
 
@@ -270,7 +269,7 @@ def set_page_metadata(page, index=False):
     '''
     if page['src'].endswith('.yaml'):
         with open(page['src'], 'r') as f:
-            page['data'] = yaml.load(f)
+            page['data'] = yaml.load(f, Loader=yaml.SafeLoader)
 
     elif page['src'].endswith('.md') or page['src'].endswith('.html'):
         fm_page = frontmatter.load(page['src'])
