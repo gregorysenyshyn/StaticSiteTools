@@ -197,11 +197,12 @@ def handle_images(options):
 
 
 def handle_audio(options):
-    local_images = os.path.join(os.getcwd(),
-                                options['audio'])
-    image_dest = options['dist']
-    print((f'linking {local_images} to {image_dest}...'), end='')
-    subprocess.run(['ln', '-s', local_images, image_dest])
+    if 'audio' in options:
+        local_images = os.path.join(os.getcwd(),
+                                    options['audio'])
+        image_dest = options['dist']
+        print((f'linking {local_images} to {image_dest}...'), end='')
+        subprocess.run(['ln', '-s', local_images, image_dest])
     print(' Done!')
 
 
