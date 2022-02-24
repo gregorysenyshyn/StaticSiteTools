@@ -46,6 +46,63 @@ def handle_image(filename, destname, options, client=None):
         extra_args['ContentType'] = 'image/gif'
     upload_file(filename, destname, extra_args, options, client)
 
+def check_buckets(bucket_name, client=None):
+    if client is None:
+        client = get_client(options, 's3')
+    response = client.list_buckets()
+    bucket_list = []
+    for item in response["Buckets"]:
+        bucket_list.append(item["Name"])
+    bucket_names = [bucket_name, f"www.{bucket_name}"]
+    for bucket_name in bucket_names:
+        if bucket_name not in bucket_list:
+            ans = input(f"No bucket named {bucket_name} exists! Create it? (y/n)")
+            if ans == y:
+                client.create_bucket(Bucket=bucket_name)
+        check_bucket_policy(bucket_name, s3_client)
+
+def get_bucket_policy(bucket_name):
+    bucket_policy = {
+        'Version': '2012-10-17',
+        'Statement': [{
+            'Sid': 'AddPerm',
+            'Effect': 'Allow',
+            'Principal': '*',
+            'Action': ['s3:GetObject'],
+            f'Resource': f'arn:aws:s3:::{bucket_name}/*'
+        }]
+    }
+    return json.dumps(bucket_policy)
+
+def create_bucket_policy(bucket_name, client=None):
+    if client == None:
+        client = get_client(options, 's3')
+
+    policy = get_bucket_policy(bucket_name)
+    client.put_bucket_policy(Bucket=bucket_name, Policy=policy)
+
+
+def check_bucket_policy(bucket_name, client=None):
+    if client == None:
+        client = get_client(options, 's3')
+    print(f'\nChecking {bucket_name} Bucket Policy')
+    try:
+        response = client.get_bucket_policy_status(Bucket=bucket_name)
+    except ClientError as e:
+        print(e)
+        create_policy = input('Create new bucket policy? (y/n) ')
+        if create_policy == "y":
+            create_bucket_policy(bucket_name, client)
+    if response['PolicyStatus']['IsPublic']:
+        print(f'{bucket_name} is public')
+    else:
+        print(f'{bucket_name} is NOT public')
+        response = client.get_bucket_policy(Bucket=bucket_name)
+        print(f'Policy:\n{response["Policy"]}')
+        new_policy = input('Reset bucket policy? (y/n) ', end='')
+        if new_policy == 'y':
+            client.put_bucket_policy(Bucket=bucket_name,
+                                     Policy=get_bucket_policy())
 
 def get_cloudfront_config(options, endpoint, oai,
                           cert_arn, index_name='index'):
@@ -133,12 +190,9 @@ def check_dns(options, validation):
 def check_certificate(options, cert_arn):
     acm_client = get_client(options, 'acm')
     certificate = acm_client.describe_certificate(CertificateArn=cert_arn)
-    if 'DomainValidationOptions' not in certificate['Certificate']:
-        # Crashed because DomainValidationOptions not in certificate yet??
-        import pdb; pdb.set_trace()
     for item in certificate['Certificate']['DomainValidationOptions']:
         if str(item['DomainName']).endswith(options['s3_bucket']):
-            if item['ValidationStatus'] is not 'SUCCESS':
+            if item['ValidationStatus'] != 'SUCCESS':
                 dns_q = (f'{certificate["Certificate"]["CertificateArn"]}'
                          f' status is {item["ValidationStatus"]}. Check DNS '
                          '(y/n)? ')
@@ -156,15 +210,23 @@ def check_certificate(options, cert_arn):
 
 
 def get_acm_certificate(options):
+    cert_arn = ''
     client = get_client(options, 'acm')
     cert_list = client.list_certificates()
     if len(cert_list['CertificateSummaryList']) == 0:
-        cert_arn = request_acm_certificate(options)
-        return cert_arn
+        ans = input('No SSL certificate found! Create one? (y/n) ')
+        if ans == 'y':
+            cert_arn = request_acm_certificate(options)
     else:
         for item in cert_list['CertificateSummaryList']:
             if str(item['DomainName']).endswith(options['s3_bucket']):
-                return item['CertificateArn']
+                cert_arn = item['CertificateArn']
+    if not cert_arn:
+        ans = input('No SSL certificate found! Create one? (y/n) ')
+        if ans == 'y':
+            cert_arn = request_acm_certificate(options)
+
+    return cert_arn
 
 
 def request_acm_certificate(options):
@@ -209,16 +271,18 @@ def create_cdn_distribution(options):
     s3_client = get_client(options, 's3')
     response = s3_client.get_bucket_location(Bucket=options['s3_bucket'])
     zone = response['LocationConstraint']
+    if not zone:
+        zone = 'us-east-1'
     endpoint = f'{options["s3_bucket"]}.s3.{zone}.amazonaws.com'
 
     cf_client = get_client(options, 'cloudfront')
     oai = get_oai(cf_client, options)
     cert_arn = get_acm_certificate(options)
-    print(cert_arn)
     check_certificate(options, cert_arn)
-    # cf_config = get_cloudfront_config(options, endpoint, oai, cert_arn)
-    # response = cf_client.create_distribution(DistributionConfig=cf_config)
-    # return response['Distribution']['ARN']
+    cf_config = get_cloudfront_config(options, endpoint, oai, cert_arn)
+    print(cf_config)
+    response = cf_client.create_distribution(DistributionConfig=cf_config)
+    return response['Distribution']['ARN']
 
 
 def check_cdn_distribution(options):
@@ -230,42 +294,31 @@ def check_cdn_distribution(options):
         create = input()
         if create == 'y':
             distribution_arn = create_cdn_distribution(options)
-            return distribution_arn
         else:
             raise SystemExit('No distributions!')
     else:
-        print(response['DistributionList'])
+        aliases = "" 
+        for item in response['DistributionList']['Items']:
+            for alias in item['Aliases']['Items']:
+                if (alias == options['s3_bucket'] or
+                    alias == f"www.{options['s3_bucket']}"):
+                    aliases += f', alias'
+                    distribution_arn = response['DistributionList']['Items']['ARN']
 
+        if aliases:
+            print(f'\nCDN distribution exists for {aliases}')
+        else:
+            create = input(f"No distributions found for {options['s3_bucket']}! "
+                            'Create one? (y/n) ')
 
-def get_bucket_policy(options):
-    bucket_policy = {
-        'Version': '2012-10-17',
-        'Statement': [{
-            'Sid': 'AddPerm',
-            'Effect': 'Allow',
-            'Principal': '*',
-            'Action': ['s3:GetObject'],
-            f'Resource': f'arn:aws:s3:::{options["s3_bucket"]}/*'
-        }]
-    }
-    return json.dumps(bucket_policy)
+            if create == 'y':
+                distribution_arn = create_cdn_distribution(options)
+            else:
+                raise SystemExit('No distributions!')
+    if not distribution_arn:
+        raise SystemExit('No distributions!')
+    return distribution_arn
 
-
-def check_bucket_policy(options, client=None):
-    if client == None:
-        client = get_client(options, 's3')
-    print('\nChecking Bucket Policy')
-    response = client.get_bucket_policy_status(Bucket=options['s3_bucket'])
-    if response['PolicyStatus']['IsPublic']:
-        print(f'{options["s3_bucket"]} is public')
-    else:
-        print(f'{options["s3_bucket"]} is NOT public')
-        response = client.get_bucket_policy(Bucket=options['s3_bucket'])
-        print(f'Policy:\n{response["Policy"]}')
-        new_policy = input('Reset bucket policy? (y/n) ', end='')
-        if new_policy == 'y':
-            client.put_bucket_policy(Bucket=options['s3_bucket'],
-                                     Policy=get_bucket_policy())
 
 
 def set_up_website(options, client=None, index_name='index', error_name='error'):
@@ -279,23 +332,26 @@ def set_up_website(options, client=None, index_name='index', error_name='error')
             'ErrorDocument': {'Key': error_name}
         })
     response = client.get_bucket_website(Bucket=options['s3_bucket'])
-    check_index_and_error_pages(response, options)
+    check_index_and_error_pages(response, options, index_name, error_name)
 
 
-def check_index_and_error_pages(response, options):
+def check_index_and_error_pages(response, options, index_name='index',
+                                error_name='error'):
     update = False
     dist_files = os.listdir(options['dist'])
 
     index_document = ''
-    if 'IndexDocument' in response:
+    if response['IndexDocument']['Suffix'] == index_name:
         index_document = response['IndexDocument']['Suffix']
-        print(f'Index Document "{index_document}": ', end='')
+        print(f'\nIndex Document "{index_document}": ', end='')
         if f'{index_document}.html' in dist_files:
             print('Exists!')
         else:
             print("Doesn't Exist!")
     else:
-        index_response = input('Error document not set.  Set it now? (y/n) ')
+        index_response = input('Index document is set to'
+                               f'{response["IndexDocument"]}.'
+                               'Set it now? (y/n) ')
         if index_response == 'y':
             update = True
             print('\n')
@@ -306,7 +362,7 @@ def check_index_and_error_pages(response, options):
                                     ' file extension for pretty urls) '))
 
     error_document = ''
-    if 'ErrorDocument' in response:
+    if response['ErrorDocument']['Key'] == error_name:
         error_document = response['ErrorDocument']['Key']
         print(f'Error Document "{error_document}": ', end='')
         if f'{error_document}.html' in dist_files:
@@ -339,16 +395,16 @@ def confirm_website_settings(options, client=None):
         print('ERROR: no website config\nSet up website? (y/n)', end='')
         answer = input()
         if answer == 'y':
-            index_name = ('Index page name? (index): ')
+            index_name = input('Index page name? (index): ')
             if index_name == '':
                 index_name = 'index'
-            error_name = ('Error page name? (error): ')
+            error_name = input('Error page name? (error): ')
             if error_name == '':
                 error_name = 'error'
             set_up_website(options, client=client,
                            index_name=index_name, error_name=error_name)
-    else:
-        check_index_and_error_pages(response, options)
+            response = client.get_bucket_website(Bucket=bucket)
+    check_index_and_error_pages(response, options)
 
 
 def upload_file(filename, destname, extra_args, options, client=None):
@@ -427,6 +483,10 @@ if __name__ == '__main__':
 
     s3_client = get_client(data['options'], 's3')
 
+    print('\n#####\n\nWebsite Settings:')
+    # check_buckets(data['options']['s3_bucket'], s3_client)
+    # confirm_website_settings(data['options'], s3_client)
+
     if args.clean:
         print(f'\n\n#####\nCleaning s3://{data["options"]["s3_bucket"]}...')
         clean(data['options'], client=s3_client)
@@ -436,10 +496,8 @@ if __name__ == '__main__':
         print((f'#####\nUploading {data["options"]["dist"]}'),
               (f'to {data["options"]["s3_bucket"]}...'))
         send_it(data['options'])
-        print('Done!')
+        print('Done!\n\n')
 
-    print('\n#####\nWebsite Settings:')
+    print('\n#####\n ')
+    print('Checking CDN Distribution...\n')
     check_cdn_distribution(data['options'])
-    # confirm_website_settings(data['options'], s3_client)
-    # check_bucket_policy(data['options'], s3_client)
-    print('\n#####')
