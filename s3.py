@@ -167,13 +167,14 @@ def create_cname_record(options, validation, zone):
 def check_dns(options, validation):
     r53_client = get_client(options, 'route53')
     zones = r53_client.list_hosted_zones()
+
     for zone in zones['HostedZones']:
         if str(zone['Name']).startswith(options['s3_bucket']):
             record = r53_client.test_dns_answer(HostedZoneId=zone['Id'],
                        RecordName=validation['ResourceRecord']['Name'],
                        RecordType='CNAME')
             if len(record['RecordData']) < 1:
-                record_q = ('No CNAME Validation Record Found.'
+                record_q = ('No CNAME Validation Record Found for .'
                             '  Create one (y/n)? ')
                 record_a = input(record_q)
                 if record_a == 'y':
@@ -232,7 +233,9 @@ def get_acm_certificate(options):
 def request_acm_certificate(options):
     client = get_client(options, 'acm')
     cert_arn = client.request_certificate(
-            DomainName=f'*.{options["s3_bucket"]}', ValidationMethod='DNS')
+            DomainName=f'{options["s3_bucket"]}',
+            ValidationMethod='DNS',
+            SubjectAlternativeNames=[f'www.{options["s3_bucket"]}'])
     return cert_arn['CertificateArn']
 
 
@@ -297,7 +300,7 @@ def check_cdn_distribution(options):
         else:
             raise SystemExit('No distributions!')
     else:
-        aliases = "" 
+        aliases = ""
         for item in response['DistributionList']['Items']:
             for alias in item['Aliases']['Items']:
                 if (alias == options['s3_bucket'] or
