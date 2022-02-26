@@ -339,6 +339,8 @@ def build_pageset(pageset, options):
     pages = get_pages(pageset['files'], options)
     j2_env = get_j2_env(pageset)
     for page in pages:
+        if 'analytics_id' in options:
+            page['data']['analytics_id'] = options['analytics_id']
         if 'production' in options and options['production']:
             page['data']['production'] = True
         if 'nav' in pageset['options']:
