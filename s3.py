@@ -88,21 +88,21 @@ def check_bucket_policy(bucket_name, client=None):
     print(f'\nChecking {bucket_name} Bucket Policy')
     try:
         response = client.get_bucket_policy_status(Bucket=bucket_name)
+        if response['PolicyStatus']['IsPublic']:
+            print(f'{bucket_name} is public')
+        else:
+            print(f'{bucket_name} is NOT public')
+            response = client.get_bucket_policy(Bucket=bucket_name)
+            print(f'Policy:\n{response["Policy"]}')
+            new_policy = input('Reset bucket policy? (y/n) ', end='')
+            if new_policy == 'y':
+                client.put_bucket_policy(Bucket=bucket_name,
+                                         Policy=get_bucket_policy())
     except ClientError as e:
         print(e)
         create_policy = input('Create new bucket policy? (y/n) ')
         if create_policy == "y":
             create_bucket_policy(bucket_name, client)
-    if response['PolicyStatus']['IsPublic']:
-        print(f'{bucket_name} is public')
-    else:
-        print(f'{bucket_name} is NOT public')
-        response = client.get_bucket_policy(Bucket=bucket_name)
-        print(f'Policy:\n{response["Policy"]}')
-        new_policy = input('Reset bucket policy? (y/n) ', end='')
-        if new_policy == 'y':
-            client.put_bucket_policy(Bucket=bucket_name,
-                                     Policy=get_bucket_policy())
 
 def get_cloudfront_config(options, endpoint, oai,
                           cert_arn, index_name='index'):
@@ -163,29 +163,145 @@ def create_cname_record(options, validation, zone):
     waiter.wait(Id=response['ChangeInfo']['Id'])
     check_dns(options, validation)
 
+def get_domain_details(options):
+    domain_client = get_client(options, 'route53domains')
+    return domain_client.get_domain_detail(DomainName=options['s3_bucket'])
 
-def check_dns(options, validation):
+
+def get_hosted_zone(options):
     r53_client = get_client(options, 'route53')
     zones = r53_client.list_hosted_zones()
 
     for zone in zones['HostedZones']:
         if str(zone['Name']).startswith(options['s3_bucket']):
-            record = r53_client.test_dns_answer(HostedZoneId=zone['Id'],
-                       RecordName=validation['ResourceRecord']['Name'],
-                       RecordType='CNAME')
-            if len(record['RecordData']) < 1:
-                record_q = ('No CNAME Validation Record Found for .'
-                            '  Create one (y/n)? ')
-                record_a = input(record_q)
-                if record_a == 'y':
-                    create_cname_record(options, validation, zone)
-                else:
-                    raise SystemExit('DNS-Validated Certificate'
-                                     ' needed to continue')
-            else:
-                if record['ResponseCode'] == 'NOERROR':
-                    print('DNS Validation CNAME Record: No Error')
-                    return 0
+            return zone
+
+def get_hosted_zone_details(zone_id, options):
+    r53_client = get_client(options, 'route53')
+    return r53_client.get_hosted_zone(Id=zone_id)
+
+def get_record_sets(zone_id, options):
+    r53_client = get_client(options, 'route53')
+    return r53_client.list_resource_record_sets(HostedZoneId=zone_id)
+
+
+def create_a_record(zone_id, record_name, options, dns_name):
+    client = get_client(options, 'route53')
+    if record_name.startswith('www'):
+        response = client.change_resource_record_sets(
+                      HostedZoneId=zone_id,
+                      ChangeBatch={
+                          'Changes': [{
+                              'Action': 'CREATE',
+                              'ResourceRecordSet': {
+                                  'Name': record_name,
+                                  'Type': 'A',
+                                  'AliasTarget': {
+                                      'HostedZoneId': 'Z3AQBSTGFYJSTF',
+                                      'EvaluateTargetHealth': False,
+                                      'DNSName': dns_name
+                                  }
+                              }
+                          }]
+                      }
+                   )
+    else:
+        response = client.change_resource_record_sets(
+                      HostedZoneId=zone_id,
+                      ChangeBatch={
+                          'Changes': [{
+                              'Action': 'CREATE',
+                              'ResourceRecordSet': {
+                                  'Name': record_name,
+                                  'Type': 'A',
+                                  'AliasTarget': {
+                                      'HostedZoneId': 'Z2FDTNDATAQYW2',
+                                      'EvaluateTargetHealth': False,
+                                      'DNSName': dns_name
+                                  }
+                              }
+                          }]
+                      }
+                   )
+    return response['ChangeInfo']['Status']
+
+def check_dns(cdn_arn, options):
+    domain_details = get_domain_details(options)
+    print(f'Retrieved domain details for {domain_details["DomainName"]}')
+    hosted_zone = get_hosted_zone(options)
+    print(f'Retrieved zone details for {hosted_zone["Name"]}')
+    zone_id = hosted_zone['Id'].split('/')[-1]
+    zone_details = get_hosted_zone_details(zone_id, options)
+    zone_nameservers = zone_details['DelegationSet']['NameServers']
+    for nameserver in domain_details['Nameservers']:
+        if nameserver['Name'] in zone_nameservers:
+            print(f'Nameserver {nameserver["Name"]} linked properly')
+        else:
+            #TO DO - Create record in not found
+            raise Exception('ERROR! Nameserver '
+                            f'{nameserver["name"]} not linked')
+
+    print('\nRetrieving A records:')
+    records = get_record_sets(zone_id, options)
+    a_records = {}
+    for record in records['ResourceRecordSets']:
+        if record['Type'] == 'A':
+            a_records[record['Name'][0:-1]] = record
+
+    if options['s3_bucket'] in a_records:
+        print(f'{options["s3_bucket"]} in A records')
+    else:
+        print(f'{options["s3_bucket"]} NOT in A records')
+        response = input('Create record now? (y/n): ')
+        if response == 'y':
+            print('\nCreating A record')
+            cf_client = get_client(options, 'cloudfront')
+            distribution = cf_client.get_distribution(
+                                            Id=str(cdn_arn).split('/')[-1])
+            status = create_a_record(zone_id,
+                                    options['s3_bucket'],
+                                    options,
+                                    distribution['Distribution']['DomainName'])
+            print(f'A record status: {status}')
+    if f'www.{options["s3_bucket"]}' in a_records:
+        print(f'www.{options["s3_bucket"]} in A records')
+    else:
+        print(f'www.{options["s3_bucket"]} NOT in A records')
+        response = input('Create record now? (y/n): ')
+        if response == 'y':
+            client = get_client(options, 's3')
+            region = client.get_bucket_location(
+                         Bucket=f'www.{options["s3_bucket"]}'
+                            )
+            region = region['LocationConstraint']
+            if not region:
+                region = 'us-east-1'
+            dns_name = f's3-website-{region}.amazonaws.com'
+            status = create_a_record(zone_id, f'www.{options["s3_bucket"]}',
+                                            options, dns_name)
+            print(f'A record status: {status}')
+
+
+def check_certificate_records(options, validation):
+    zone = get_hosted_zone(options)
+    record = r53_client.test_dns_answer(HostedZoneId=zone['Id'],
+               RecordName=validation['ResourceRecord']['Name'],
+               RecordType='CNAME')
+    if len(record['RecordData']) < 1:
+        record_q = ('No CNAME Validation Record Found for',
+                    f' {validation["ResourceRecord"]["Name"]}.'
+                    '  Create one (y/n)? ')
+        record_a = input(record_q)
+        if record_a == 'y':
+            create_cname_record(options, validation, zone)
+        else:
+            raise SystemExit('DNS-Validated Certificate'
+                             ' needed to continue')
+    else:
+        if record['ResponseCode'] == 'NOERROR':
+            print( f' {validation["ResourceRecord"]["Name"]}',
+                    'DNS Validation CNAME Record found')
+            return
 
 
 def check_certificate(options, cert_arn):
@@ -199,7 +315,7 @@ def check_certificate(options, cert_arn):
                          '(y/n)? ')
                 dns_check = input(dns_q)
                 if dns_check == 'y':
-                    if check_dns(options, item) == 0:
+                    if check_certificate_records(options, item) == 0:
                         wait_q = 'Continue to wait for validation (y/n)? '
                         wait_a = input(wait_q)
                         if wait_a == 'y':
@@ -305,11 +421,11 @@ def check_cdn_distribution(options):
             for alias in item['Aliases']['Items']:
                 if (alias == options['s3_bucket'] or
                     alias == f"www.{options['s3_bucket']}"):
-                    aliases += f', alias'
-                    distribution_arn = response['DistributionList']['Items']['ARN']
+                    aliases += f'{alias} '
+                    distribution_arn = response['DistributionList']['Items'][0]['ARN']
 
         if aliases:
-            print(f'\nCDN distribution exists for {aliases}')
+            print(f'CDN distribution exists for {aliases}')
         else:
             create = input(f"No distributions found for {options['s3_bucket']}! "
                             'Create one? (y/n) ')
@@ -321,7 +437,6 @@ def check_cdn_distribution(options):
     if not distribution_arn:
         raise SystemExit('No distributions!')
     return distribution_arn
-
 
 
 def set_up_website(options, client=None, index_name='index', error_name='error'):
@@ -394,8 +509,10 @@ def confirm_website_settings(options, client=None):
     bucket = options['s3_bucket']
     try:
         response = client.get_bucket_website(Bucket=bucket)
+        check_index_and_error_pages(response, options)
     except ClientError:
-        print('ERROR: no website config\nSet up website? (y/n)', end='')
+        print(f'ERROR: no website config for {bucket}\nSet up website? (y/n) ',
+                end='')
         answer = input()
         if answer == 'y':
             index_name = input('Index page name? (index): ')
@@ -406,8 +523,30 @@ def confirm_website_settings(options, client=None):
                 error_name = 'error'
             set_up_website(options, client=client,
                            index_name=index_name, error_name=error_name)
+            confirm_website_settings(options, client)
+    bucket = f'www.{options["s3_bucket"]}'
+    try:
+        response = client.get_bucket_website(Bucket=bucket)
+        print(f'{bucket} now redirecting all requests to',
+              f'{response["RedirectAllRequestsTo"]["HostName"]} over',
+              f'{response["RedirectAllRequestsTo"]["Protocol"]}')
+    except:
+        print(f'ERROR: no website config for {bucket}\nSet up redirect? (y/n) ',
+                end='')
+        answer = input()
+        if answer == 'y':
+            print('\nSetting up website redirect... ')
+            client.put_bucket_website(
+                Bucket=bucket,
+                WebsiteConfiguration={
+                    'RedirectAllRequestsTo': {
+                        'HostName': options['s3_bucket'],
+                        'Protocol': 'https'
+                        } })
             response = client.get_bucket_website(Bucket=bucket)
-    check_index_and_error_pages(response, options)
+            print(f'{bucket} will now redirect all requests to ',
+                  f'{response["RedirectAllRequestsTo"]["HostName"]} over ',
+                  f'{response["RedirectAllRequestsTo"]["Protocol"]}')
 
 
 def upload_file(filename, destname, extra_args, options, client=None):
@@ -438,18 +577,13 @@ def send_it(options, client=None):
                     handle_css(filename, destname, options, client)
                 elif destname.startswith('images/'):
                     pass
-                #subprocess.run(['aws', 's3', 'sync',
-                #    ##TODO os.path.join?
-                #               options['dist'],
-                #               f's3://{options["s3_bucket"]}',
-                #               '--delete'])
         else:
             print(f'ERROR - Not uploading hidden file {filename}')
 
 
 def clean(options, images=False, client=None):
     if client == None:
-        client = get_client(options, 's3')
+        client = (options, 's3')
     response = client.list_objects(Bucket=options['s3_bucket'])
     if 'Contents' in response:
         for item in response['Contents']:
@@ -461,8 +595,9 @@ def clean(options, images=False, client=None):
 
 
 def get_client(options, client_type):
+    us_east_1_clients = ['acm', 'route53domains']
     session = boto3.Session(profile_name=options['aws_profile_name'])
-    if client_type == 'acm':
+    if client_type in us_east_1_clients:
         client = session.client(client_type, region_name='us-east-1')
     else:
         client = session.client(client_type)
@@ -487,8 +622,8 @@ if __name__ == '__main__':
     s3_client = get_client(data['options'], 's3')
 
     print('\n#####\n\nWebsite Settings:')
-    # check_buckets(data['options']['s3_bucket'], s3_client)
-    # confirm_website_settings(data['options'], s3_client)
+    check_buckets(data['options']['s3_bucket'], s3_client)
+    confirm_website_settings(data['options'], s3_client)
 
     if args.clean:
         print(f'\n\n#####\nCleaning s3://{data["options"]["s3_bucket"]}...')
@@ -503,4 +638,8 @@ if __name__ == '__main__':
 
     print('\n#####\n ')
     print('Checking CDN Distribution...\n')
-    check_cdn_distribution(data['options'])
+    cdn_arn = check_cdn_distribution(data['options'])
+
+    print('\n#####\n ')
+    print('Checking DNS Records...\n')
+    check_dns(cdn_arn, data['options'])
