@@ -2,6 +2,11 @@ options:
   dist: dist
   images: images
   s3_bucket: S3_BUCKET_NAME 
+  htaccess: src/apache/.htaccess
+  aws_profile_name: default
+  analytics_id: ""
+  recaptcha_sitekey: ''
+  cache_control_age: 259200
 
 
 js:
