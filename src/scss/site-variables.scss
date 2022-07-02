@@ -1,0 +1,19 @@
+$col1: #284B99; //navy blue
+$col2: #728ECC; //grey-blue
+$hl1: #A8F1FF; //teal
+$hl2: #FF9869; //orange
+$contrast: #CC8272; //brown
+
+@mixin sm {
+  @media screen and (max-width: 1000px) {
+    @content;
+  }
+}
+
+@mixin md {
+  @media screen and (min-width: 1000) and (max-width: 1500px) {
+    @content;
+  }
+}
+
+

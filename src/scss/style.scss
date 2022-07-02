@@ -1,15 +1,15 @@
-$primary_color: #000;
-$secondary_color: #F00;
+* {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
 
-footer {
-  display: flex;
-  flex-direction: row;
-  justify-content: flex-end;
-  align-items: center;
+body {
+  margin: 0;
+}
 
-  a {
-    margin: 0 2rem;
-    text-decoration: none;
-    color: black;
-  }
+
+a {
+  color: $col2;
+  text-decoration: none;
 }
