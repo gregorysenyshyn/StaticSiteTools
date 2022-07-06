@@ -13,3 +13,18 @@ a {
   color: $col2;
   text-decoration: none;
 }
+
+button {
+  font-size: 1rem;
+  padding: 0.5rem;
+  background-color: $col1;
+  color: $hl1;
+  border-radius: 4px;
+  border: 0;
+  &:hover {
+    background-color: lighten($col1, 20);
+  }
+  &:active {
+    transform: scale(0.98);
+  }
+}
