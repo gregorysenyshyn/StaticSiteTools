@@ -1,0 +1,39 @@
+---
+title: Contact Us
+description: Contact mycoolsite.com
+---
+{% extends "layout.html" %}
+
+{% block head %}
+<script src="/js/contact.js"></script>
+<script src="https://www.google.com/recaptcha/api.js?render=explicit&onload=onRecaptchaLoadCallback"></script>
+{% endblock head %}
+
+{% block main %}
+<div id="contact-wrapper">
+  <h1>
+    Contact Us
+  </h1>
+  <form id="contact-form">
+    <div id="contact-name-input-wrapper">
+      <input type="text" id="contact-name-input" placeholder="Your Name" class="form-control">
+    </div>
+    <div id="contact-phone-input-wrapper">
+      <input type="tel" id="contact-phone-input" placeholder="Your Phone Number" class="form-control">
+    </div>
+    <div id="contact-email-input-wrapper">
+      <input type="email" id="contact-email-input" placeholder="Your Email Address" class="form-control">
+    </div>
+    <div id="contact-message-input-wrapper">
+      <textarea id="contact-message-input" rows="10" placeholder="Your Message"></textarea>
+    </div>
+    <div id="contact-captcha-wrapper">
+    </div>
+    <div id="contact-button-wrapper">
+      <button type="button" onClick="submitContactForm()">
+        Submit
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock main %}
