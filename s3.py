@@ -480,7 +480,7 @@ def check_index_and_error_pages(response, options, index_name='index',
                                     ' file extension for pretty urls) '))
 
     error_document = ''
-    if response['ErrorDocument']['Key'] == error_name:
+    if 'ErrorDocument' in response and response['ErrorDocument']['Key'] == error_name:
         error_document = response['ErrorDocument']['Key']
         print(f'Error Document "{error_document}": ', end='')
         if f'{error_document}.html' in dist_files:
