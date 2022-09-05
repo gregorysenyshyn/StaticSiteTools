@@ -212,8 +212,7 @@ def handle_audio(options):
 
 
 def markdown_filter(text):
-    markdown = mistune.create_markdown()
-    return markdown(text)
+    return mistune.html(text)
 
 
 def get_j2_env(pageset):
