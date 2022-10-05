@@ -56,8 +56,8 @@ def check_buckets(bucket_name, client=None):
     bucket_names = [bucket_name, f"www.{bucket_name}"]
     for bucket_name in bucket_names:
         if bucket_name not in bucket_list:
-            ans = input(f"No bucket named {bucket_name} exists! Create it? (y/n)")
-            if ans == y:
+            ans = input(f"No bucket named {bucket_name} exists! Create it? (y/n) ")
+            if ans == 'y':
                 client.create_bucket(Bucket=bucket_name)
         check_bucket_policy(bucket_name, s3_client)
 
@@ -278,19 +278,20 @@ def check_dns(cdn_arn, options):
                 region = 'us-east-1'
             dns_name = f's3-website-{region}.amazonaws.com'
             status = create_a_record(zone_id, f'www.{options["s3_bucket"]}',
-                                            options, dns_name)
+                                     options, dns_name)
             print(f'A record status: {status}')
 
 
 def check_certificate_records(options, validation):
     zone = get_hosted_zone(options)
+    r53_client = get_client(options, 'route53')
     record = r53_client.test_dns_answer(HostedZoneId=zone['Id'],
                RecordName=validation['ResourceRecord']['Name'],
                RecordType='CNAME')
     if len(record['RecordData']) < 1:
-        record_q = ('No CNAME Validation Record Found for',
-                    f' {validation["ResourceRecord"]["Name"]}.'
-                    '  Create one (y/n)? ')
+        record_q = str.join('No CNAME Validation Record Found for',
+                            f' {validation["ResourceRecord"]["Name"]}.'
+                            '  Create one (y/n)? ')
         record_a = input(record_q)
         if record_a == 'y':
             create_cname_record(options, validation, zone)
@@ -310,20 +311,9 @@ def check_certificate(options, cert_arn):
     for item in certificate['Certificate']['DomainValidationOptions']:
         if str(item['DomainName']).endswith(options['s3_bucket']):
             if item['ValidationStatus'] != 'SUCCESS':
-                dns_q = (f'{certificate["Certificate"]["CertificateArn"]}'
-                         f' status is {item["ValidationStatus"]}. Check DNS '
-                         '(y/n)? ')
-                dns_check = input(dns_q)
-                if dns_check == 'y':
-                    if check_certificate_records(options, item) == 0:
-                        wait_q = 'Continue to wait for validation (y/n)? '
-                        wait_a = input(wait_q)
-                        if wait_a == 'y':
-                            waiter = acm_client.get_waiter(
-                                                       'certificate_validated')
-                            waiter.wait(CertificateArn=cert_arn)
-                else:
-                    raise SystemExit('Valid Certificate Needed to Proceed.')
+                print('Waiting up to 40 minutes for certificate validation...')
+                waiter = acm_client.get_waiter('certificate_validated')
+                waiter.wait(CertificateArn=cert_arn)
 
 
 def get_acm_certificate(options):
@@ -428,7 +418,7 @@ def check_cdn_distribution(options):
             print(f'CDN distribution exists for {aliases}')
         else:
             create = input(f"No distributions found for {options['s3_bucket']}! "
-                            'Create one? (y/n) ')
+                           'Create one? (y/n) ')
 
             if create == 'y':
                 distribution_arn = create_cdn_distribution(options)
@@ -440,7 +430,7 @@ def check_cdn_distribution(options):
 
 
 def set_up_website(options, client=None, index_name='index', error_name='error'):
-    if client == None:
+    if client is None:
         client = get_client(options, 's3')
     print('\nSetting up website... ')
     client.put_bucket_website(
@@ -497,14 +487,14 @@ def check_index_and_error_pages(response, options, index_name='index',
                     print(filename)
             error_document = input(('\nWhich file? (exclude'
                                     ' file extension for pretty urls) '))
-    if update == True:
+    if update is True:
         set_up_website(options,
                        index_name=index_document,
                        error_name=error_document)
 
 
 def confirm_website_settings(options, client=None):
-    if client == None:
+    if client is None:
         client = get_client(options, 's3')
     bucket = options['s3_bucket']
     try:
@@ -532,7 +522,7 @@ def confirm_website_settings(options, client=None):
               f'{response["RedirectAllRequestsTo"]["Protocol"]}')
     except:
         print(f'ERROR: no website config for {bucket}\nSet up redirect? (y/n) ',
-                end='')
+              end='')
         answer = input()
         if answer == 'y':
             print('\nSetting up website redirect... ')
@@ -542,7 +532,7 @@ def confirm_website_settings(options, client=None):
                     'RedirectAllRequestsTo': {
                         'HostName': options['s3_bucket'],
                         'Protocol': 'https'
-                        } })
+                        }})
             response = client.get_bucket_website(Bucket=bucket)
             print(f'{bucket} will now redirect all requests to ',
                   f'{response["RedirectAllRequestsTo"]["HostName"]} over ',
@@ -562,7 +552,7 @@ def upload_file(filename, destname, extra_args, options, client=None):
 
 
 def send_it(options, client=None):
-    if client == None:
+    if client is None:
         client = get_client(options, 's3')
     for filename in glob.glob(f'{options["dist"]}/**', recursive=True):
         if not filename.startswith('.'):
@@ -582,12 +572,12 @@ def send_it(options, client=None):
 
 
 def clean(options, images=False, client=None):
-    if client == None:
+    if client is None:
         client = (options, 's3')
     response = client.list_objects(Bucket=options['s3_bucket'])
     if 'Contents' in response:
         for item in response['Contents']:
-            if not item['Key'].startswith(options['images']) or images == True:
+            if not item['Key'].startswith(options['images']) or images:
                 print(f'removing {item["Key"]}... ', end='')
                 client.delete_object(Bucket=options['s3_bucket'],
                                      Key=item['Key'])
@@ -621,20 +611,20 @@ if __name__ == '__main__':
 
     s3_client = get_client(data['options'], 's3')
 
-    print('\n#####\n\nWebsite Settings:')
-    check_buckets(data['options']['s3_bucket'], s3_client)
-    confirm_website_settings(data['options'], s3_client)
+    # print('\n#####\n\nWebsite Settings:')
+    # check_buckets(data['options']['s3_bucket'], s3_client)
+    # confirm_website_settings(data['options'], s3_client)
 
-    if args.clean:
-        print(f'\n\n#####\nCleaning s3://{data["options"]["s3_bucket"]}...')
-        clean(data['options'], client=s3_client)
-        print('All Clean!\n\n')
+    # if args.clean:
+    #     print(f'\n\n#####\nCleaning s3://{data["options"]["s3_bucket"]}...')
+    #     clean(data['options'], client=s3_client)
+    #     print('All Clean!\n\n')
 
-    if not args.check:
-        print((f'#####\nUploading {data["options"]["dist"]}'),
-              (f'to {data["options"]["s3_bucket"]}...'))
-        send_it(data['options'])
-        print('Done!\n\n')
+    # if not args.check:
+    #     print((f'#####\nUploading {data["options"]["dist"]}'),
+    #           (f'to {data["options"]["s3_bucket"]}...'))
+    #     send_it(data['options'])
+    #     print('Done!\n\n')
 
     print('\n#####\n ')
     print('Checking CDN Distribution...\n')
