@@ -611,20 +611,20 @@ if __name__ == '__main__':
 
     s3_client = get_client(data['options'], 's3')
 
-    # print('\n#####\n\nWebsite Settings:')
-    # check_buckets(data['options']['s3_bucket'], s3_client)
-    # confirm_website_settings(data['options'], s3_client)
+    print('\n#####\n\nWebsite Settings:')
+    check_buckets(data['options']['s3_bucket'], s3_client)
+    confirm_website_settings(data['options'], s3_client)
 
-    # if args.clean:
-    #     print(f'\n\n#####\nCleaning s3://{data["options"]["s3_bucket"]}...')
-    #     clean(data['options'], client=s3_client)
-    #     print('All Clean!\n\n')
+    if args.clean:
+        print(f'\n\n#####\nCleaning s3://{data["options"]["s3_bucket"]}...')
+        clean(data['options'], client=s3_client)
+        print('All Clean!\n\n')
 
-    # if not args.check:
-    #     print((f'#####\nUploading {data["options"]["dist"]}'),
-    #           (f'to {data["options"]["s3_bucket"]}...'))
-    #     send_it(data['options'])
-    #     print('Done!\n\n')
+    if not args.check:
+        print((f'#####\nUploading {data["options"]["dist"]}'),
+              (f'to {data["options"]["s3_bucket"]}...'))
+        send_it(data['options'])
+        print('Done!\n\n')
 
     print('\n#####\n ')
     print('Checking CDN Distribution...\n')
