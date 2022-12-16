@@ -226,20 +226,6 @@ def create_a_record(zone_id, record_name, options, dns_name):
     return response['ChangeInfo']['Status']
 
 def check_dns(cdn_arn, options):
-    domain_details = get_domain_details(options)
-    print(f'Retrieved domain details for {domain_details["DomainName"]}')
-    hosted_zone = get_hosted_zone(options)
-    print(f'Retrieved zone details for {hosted_zone["Name"]}')
-    zone_id = hosted_zone['Id'].split('/')[-1]
-    zone_details = get_hosted_zone_details(zone_id, options)
-    zone_nameservers = zone_details['DelegationSet']['NameServers']
-    for nameserver in domain_details['Nameservers']:
-        if nameserver['Name'] in zone_nameservers:
-            print(f'Nameserver {nameserver["Name"]} linked properly')
-        else:
-            #TO DO - Create record in not found
-            raise Exception('ERROR! Nameserver '
-                            f'{nameserver["name"]} not linked')
 
     print('\nRetrieving A records:')
     records = get_record_sets(zone_id, options)
@@ -494,6 +480,20 @@ def check_index_and_error_pages(response, options, index_name='index',
 
 
 def confirm_website_settings(options, client=None):
+    domain_details = get_domain_details(options)
+    print(f'Retrieved domain details for {domain_details["DomainName"]}')
+    hosted_zone = get_hosted_zone(options)
+    print(f'Retrieved zone details for {hosted_zone["Name"]}')
+    zone_id = hosted_zone['Id'].split('/')[-1]
+    zone_details = get_hosted_zone_details(zone_id, options)
+    zone_nameservers = zone_details['DelegationSet']['NameServers']
+    for nameserver in domain_details['Nameservers']:
+        if nameserver['Name'] in zone_nameservers:
+            print(f'Nameserver {nameserver["Name"]} linked properly')
+        else:
+            #TO DO - Create record in not found
+            raise Exception('ERROR! Nameserver '
+                            f'{nameserver["name"]} not linked')
     if client is None:
         client = get_client(options, 's3')
     bucket = options['s3_bucket']
