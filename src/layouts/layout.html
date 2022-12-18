@@ -32,12 +32,13 @@
 
     {% include 'header.html' %}
 
-    {% block content %}
+    {% block main_image %}
+    {% endblock main_image %}
+    <div id="header-sticky"></div>
     <main>
       {% block main %}
       {% endblock main %}
     </main>
-    {% endblock content %}
     {% include 'footer.html' %}
 
     {% block scripts %}

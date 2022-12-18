@@ -3,6 +3,8 @@ $col2: #728ECC; //grey-blue
 $hl1: #A8F1FF; //teal
 $hl2: #FF9869; //orange
 $contrast: #CC8272; //brown
+$header-height: 5rem;
+$background-color: white;
 
 @mixin sm {
   @media screen and (max-width: 1000px) {
@@ -14,6 +16,44 @@ $contrast: #CC8272; //brown
   @media screen and (min-width: 1000) and (max-width: 1500px) {
     @content;
   }
+}
+
+* {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  text-align: justify;
+  text-justify: inter-word;
+}
+
+body {
+  background-color: $background-color;
+}
+
+header {
+  height: $header-height;
+}
+
+header, footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+a {
+  text-decoration: none;
+}
+
+#header-sticky {
+  position: sticky;
+  top: 0;
+  height: $header-height;
+  background-color: $background-color;
+}
+
+.responsive-image {
+  max-width: 100%;
+  height: auto;
 }
 
 
