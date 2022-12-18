@@ -619,6 +619,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
     data = tools.load_yaml(args.data)
 
+    check = input('Did you remember to build with --production? (N/y)')
+    if not check == 'y':
+        print('Please build with --production before uploading!')
+        return
+
     s3_client = get_client(data['options'], 's3')
 
     print('\n#####\n\nWebsite Settings:')
