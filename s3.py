@@ -612,7 +612,6 @@ if __name__ == '__main__':
     check = input('Did you remember to build with --production? (N/y)')
     if not check == 'y':
         print('Please build with --production before uploading!')
-        return
 
     s3_client = get_client(data['options'], 's3')
 
