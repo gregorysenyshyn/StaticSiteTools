@@ -4,6 +4,7 @@ options:
   s3_bucket: S3_BUCKET_NAME 
   htaccess: src/apache/.htaccess
   aws_profile_name: default
+  google_ads_id: ""
   analytics_id: ""
   recaptcha_sitekey: ''
   cache_control_age: 259200
