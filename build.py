@@ -5,8 +5,7 @@ import time
 import argparse
 import subprocess
 
-import tools
-
+from build import tools
 
 def build(data):
 
@@ -52,13 +51,21 @@ def build(data):
 
 if __name__ == '__main__':
 
+    try:
+        from shared import utils, client
+
+    except ImportError:
+        import sys
+        sys.path.append(sys.path[0] + '/..')
+        from shared import utils, client
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', help='YAML data file')
     parser.add_argument('--production',
                         action='store_true',
                         help='Include analytics, etc.')
     args = parser.parse_args()
-    data = tools.load_yaml(args.data)
+    data = utils.load_yaml(args.data)
     if args.production:
         data['options']['production'] = True
     build(data)

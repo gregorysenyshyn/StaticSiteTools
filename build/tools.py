@@ -9,15 +9,11 @@ import subprocess
 from jinja2 import BaseLoader
 from jinja2 import Environment
 
+import yaml
 import sass
 import mistune
 import frontmatter
 
-import yaml
-try:
-    from yaml import CLoader as Loader
-except ImportError:
-    from yaml import Loader
 
 # ####### #
 #  UTILS  #
@@ -136,10 +132,6 @@ def link_static(src, dest):
                     os.path.expanduser(dest)])
     print(' Done!')
 
-
-def load_yaml(data):
-    with open(data) as f:
-        return yaml.load(f, Loader=Loader)
 
 # #### #
 #  JS  #
