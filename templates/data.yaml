@@ -37,7 +37,7 @@ html:
         template: layout.html
         dest: '' 
     partials: 
-      - src/partials/main/*.html
+      - src/partials/*.html
     layouts:
       - src/layouts/layout.html
     options: {}
