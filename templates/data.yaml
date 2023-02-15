@@ -5,6 +5,8 @@ options:
   dist: dist
   images: images
   htaccess: src/apache/.htaccess
+  aws_profile_name: default
+  google_ads_id: ""
   analytics_id: ""
   recaptcha_sitekey: ''
   cache_control_age: 259200

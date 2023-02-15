@@ -336,6 +336,8 @@ def build_pageset(pageset, options):
             page['data']['production'] = True
         if 'analytics_id' in options:
             page['data']['analytics_id'] = options['analytics_id']
+        if 'google_ads_id' in options:
+            page['data']['google_ads_id'] = options['google_ads_id']
 
         # pageset options
         if 'recaptcha' in pageset['options']:
