@@ -13,6 +13,7 @@ def check_buckets(bucket_name, client=None):
                 client.create_bucket(Bucket=bucket_name)
         check_bucket_policy(bucket_name, s3_client)
 
+
 def get_bucket_policy(bucket_name):
     bucket_policy = {
         'Version': '2012-10-17',
@@ -25,6 +26,7 @@ def get_bucket_policy(bucket_name):
         }]
     }
     return json.dumps(bucket_policy)
+
 
 def create_bucket_policy(bucket_name, client=None):
     if client == None:
@@ -55,6 +57,7 @@ def check_bucket_policy(bucket_name, client=None):
         create_policy = input('Create new bucket policy? (y/n) ')
         if create_policy == "y":
             create_bucket_policy(bucket_name, client)
+
 
 def get_cloudfront_config(options, endpoint, oai,
                           cert_arn, index_name='index'):
@@ -115,6 +118,7 @@ def create_cname_record(options, validation, zone):
     waiter.wait(Id=response['ChangeInfo']['Id'])
     check_dns(options, validation)
 
+
 def get_domain_details(options):
     domain_client = get_client(options, 'route53domains')
     return domain_client.get_domain_detail(DomainName=options['s3_bucket'])
@@ -128,9 +132,11 @@ def get_hosted_zone(options):
         if str(zone['Name']).startswith(options['s3_bucket']):
             return zone
 
+
 def get_hosted_zone_details(zone_id, options):
     r53_client = get_client(options, 'route53')
     return r53_client.get_hosted_zone(Id=zone_id)
+
 
 def get_record_sets(zone_id, options):
     r53_client = get_client(options, 'route53')
@@ -177,8 +183,8 @@ def create_a_record(zone_id, record_name, options, dns_name):
                    )
     return response['ChangeInfo']['Status']
 
-def check_dns(cdn_arn, options):
 
+def check_dns(cdn_arn, options):
     print('\nRetrieving A records:')
     records = get_record_sets(zone_id, options)
     a_records = {}
@@ -490,3 +496,33 @@ def confirm_website_settings(options, client=None):
                   f'{response["RedirectAllRequestsTo"]["HostName"]} over ',
                   f'{response["RedirectAllRequestsTo"]["Protocol"]}')
 
+
+if __name__ == '__main__':
+
+    try:
+        from shared import utils, client
+
+    except ImportError:
+        import sys
+        sys.path.append(sys.path[0] + '/..')
+        from shared import utils, client
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data', help='YAML data file', required=True)
+    args = parser.parse_args()
+    data = utils.load_yaml(args.data)
+
+            
+    s3_client = client.get_client(data['options'], 's3')
+
+    print('\n#####\n\nWebsite Settings:')
+    check_buckets(data['options']['s3_bucket'], s3_client)
+    confirm_website_settings(data['options'], s3_client)
+
+    print('\n#####\n ')
+    print('Checking CDN Distribution...\n')
+    cdn_arn = check_cdn_distribution(data['options'])
+
+    print('\n#####\n ')
+    print('Checking DNS Records...\n')
+    check_dns(cdn_arn, data['options'])

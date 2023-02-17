@@ -1,0 +1,23 @@
+---
+title: That's a Problem!
+---
+{% extends 'layout.html' %}
+
+{% block main %}
+<div id="redirect-wrapper">
+  <div id="redirect-text">
+    <h1>Uh-oh!</h1>
+    <p>You should never end up here!  Something went wrong!</p>
+    <p>
+      Sorry for the detour.  You will be redirected back to the homepage in a few seconds!
+    </p>
+  </div>
+</div>
+{% endblock main %}
+
+
+{% block scripts %}
+<script src="/js/redirect.js"></script>
+{% endblock scripts %}
+
+
