@@ -5,7 +5,7 @@ import time
 import argparse
 import subprocess
 
-from build import tools
+from website import tools
 
 def build(data):
 
@@ -38,12 +38,13 @@ def build(data):
     tools.handle_audio(data['options'])
 
     print('\n\n=== M I S C ===')
-    print('Creating symlink for .htaccess...', end='')
-    subprocess.run(['ln', '-s',
-                    os.path.join(os.getcwd(),
-                                 data['options']['htaccess']),
-                    data['options']['dist']])
-    print(' Done!')
+    if not data['options']['production']:
+        print('Creating symlink for .htaccess...', end='')
+        subprocess.run(['ln', '-s',
+                        os.path.join(os.getcwd(),
+                                     data['options']['htaccess']),
+                        data['options']['dist']])
+        print(' Done!')
 
     print('\n\n=== Entire build done in',
           f'{round(float(time.time() - t0), 4)} seconds ===')
