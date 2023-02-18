@@ -5,6 +5,15 @@ import traceback
 from urllib import request
 from urllib.parse import parse_qs, urlencode
 
+"""
+Environment Variables:
+
+VERIFIED_EMAIL
+EMAIL_ARN
+THANK_YOU_ADDRESS
+ERROR_ADDRESS
+"""
+
 def send_email(body):
     client = boto3.client('sesv2')
     response = client.send_email(
@@ -39,7 +48,7 @@ def lambda_handler(event, context):
         return {
             'statusCode': 302,
             'headers': {
-                'Location': 'https://ontarioliteracy.ca/thank-you'
+                'Location': os.environ['THANK_YOU_ADDRESS']
             }
     }
         return {'statusCode': 200, 'body': 'message sent'}
@@ -47,9 +56,9 @@ def lambda_handler(event, context):
     except Exception as err:
         print(traceback.print_exc())
         return {
-            'statusCode': 500,
+            'statusCode': 302,
             'headers': {
-                'Location': 'https://ontarioliteracy.ca/uh-oh'
+                'Location': os.environ['ERROR_ADDRESS']
             },
             'body': json.dumps("That's a problem!")
         }

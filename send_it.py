@@ -96,10 +96,38 @@ if __name__ == '__main__':
     else:
         raise SystemExit('Please build with --production before uploading!')
 
-    check = input('Ready to send? (Y/n) ')
-    if not check == 'n':
+    answer = input('Ready to send? (Y/n) ')
+    if not answer == 'n':
         print((f'#####\nUploading {data["options"]["dist"]}'),
               (f'to {data["options"]["s3_bucket"]}...'))
         s3_client = get_client('s3', data['options'])
         send_it(data['options'], s3_client)
-        print('Done!\n\n')
+        print('Done!\n')
+
+    answer = input("\nCreate CDN invalidation? (Y/n)")
+    if not answer == 'n':
+        cf_client = get_client("cloudfront", options)
+        distribution_id = None
+        print("\nGetting distribution ID...")
+        response = cf_client.list_distributions()
+        for item in response['DistributionList']['Items']:
+            if item['DomainName'] == data['options']['s3_bucket']:
+                distribution_id = item['Id']
+        print("\nCreating invalidation... ", end="")
+        response = cf_client.create_invalidation(
+                        DistributionId=distribution_id,
+                        InvalidationBatch={ 'Paths': "/*" }
+                        )
+        print("Done!")
+        print("\nWaiting for invalidation to complete... ", end="")
+        waiter = cf_client.get_waiter('invalidation_completed')
+        waiter.wait(DistributionId=distribution_id,
+                    Id=response['Invalidation']['Id'])
+        print("Done!")
+
+
+    answer = input('\nCheck website settings? (Y/n) ')
+    if not answer == 'n':
+        from website.setup import check
+        check(data['options'])
+

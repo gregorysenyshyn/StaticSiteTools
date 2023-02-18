@@ -3,6 +3,8 @@ import json
 import argparse
 import datetime
 
+import sys
+sys.path.append(sys.path[0] + '/..')
 from shared import utils
 from shared.client import get_client
 
@@ -475,26 +477,29 @@ def check_dns(cdn_arn, options):
             print(f'A record status: {status}')
 
 
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data', help='YAML data file', required=True)
-    args = parser.parse_args()
-    data = utils.load_yaml(args.data)
-
-            
-    s3_client = get_client('s3', data["options"])
+def check(options):
+    s3_client = get_client('s3', options)
 
     print('\n#####\n\nWebsite Settings:')
-    check_buckets(data['options']['s3_bucket'], s3_client)
-    confirm_website_settings(data['options'], s3_client)
+    check_buckets(options['s3_bucket'], s3_client)
+    confirm_website_settings(options, s3_client)
 
     print('\n#####\n ')
     print('Checking CDN Distribution...\n')
-    cdn_arn = check_cdn_distribution(data['options'])
+    cdn_arn = check_cdn_distribution(options)
 
     print('\n#####\n ')
     print('Checking DNS Records...\n')
-    check_dns(cdn_arn, data['options'])
+    check_dns(cdn_arn, options)
 
     print('\nCheck Complete!\n')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data', help='YAML data file', required=True)
+    args = parser.parse_args()
+    options = utils.load_yaml(args.data)['options']
+    check(options)
+
+            
