@@ -6,6 +6,8 @@ from urllib import request
 from urllib.parse import parse_qs, urlencode
 
 """
+Lambda Proxy
+
 Environment Variables:
 
 VERIFIED_EMAIL

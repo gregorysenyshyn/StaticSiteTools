@@ -2,12 +2,21 @@ import argparse
 
 import boto3
 
+try:
+    from shared import utils, client
+
+except ImportError:
+    import sys
+    sys.path.append(sys.path[0] + '/..')
+    from shared import utils, client
+
+
 def createEmailList(client):
     list_name = input("List name: ")
     list_description = input("List Description (private): ")
     add_topic_answer = input("Add one or more topics? (y/n): ")
     if add_topic_answer == 'y':
-        topics = get_topics(topics)
+        topics = get_topics()
     response = client.create_contact_list(ContactListName=list_name,
                                           Topics=topics,
                                           Description=list_description)
@@ -39,14 +48,6 @@ def get_topics(topics=None):
     return topics
 
 
-def get_list_details(ses_client):
-    return ses_client.list_contact_lists()
-
-
-def get_list_name(ses_client):
-    response = ses_client.list_contact_lists()
-    return response["ContactLists"][0]["ContactListName"]
-
 
 def add_simulator_emails():
     import boto3
@@ -74,14 +75,6 @@ def add_simulator_emails():
 
 
 if __name__ == '__main__':
-
-    try:
-        from shared import utils, client
-
-    except ImportError:
-        import sys
-        sys.path.append(sys.path[0] + '/..')
-        from shared import utils, client
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', help='YAML data file', required=True)

@@ -5,6 +5,17 @@ sys.path.append(sys.path[0] + '/..')
 from shared.utils import load_yaml
 from shared.client import get_client
 
+
+
+"""
+Steps:
+    Get verfied email arn
+    Api with Lambda Proxy Integration
+    Give Lambda function "SendEmail" permission from SESv2
+"""
+
+
+
 def set_up_contact_form(cf_data, options):
     sesv2_client = get_client('sesv2', options)
     email = "@".join(cf_data['email_address'], options['s3_bucket'])
