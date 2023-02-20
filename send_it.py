@@ -1,8 +1,8 @@
 import os
 import glob
 import json
+import time
 import argparse
-import datetime
 
 import boto3
 from botocore.exceptions import ClientError
@@ -93,8 +93,6 @@ if __name__ == '__main__':
         data['options']['production'] = True
         import build
         build.build(data)
-    else:
-        raise SystemExit('Please build with --production before uploading!')
 
     answer = input('Ready to send? (Y/n) ')
     if not answer == 'n':
@@ -106,19 +104,23 @@ if __name__ == '__main__':
 
     answer = input("\nCreate CDN invalidation? (Y/n)")
     if not answer == 'n':
-        cf_client = get_client("cloudfront", options)
+        cf_client = get_client("cloudfront", data['options'])
         distribution_id = None
         print("\nGetting distribution ID...")
         response = cf_client.list_distributions()
         for item in response['DistributionList']['Items']:
-            if item['DomainName'] == data['options']['s3_bucket']:
+            if data['options']['s3_bucket'] in item['Aliases']['Items']:
                 distribution_id = item['Id']
-        print("\nCreating invalidation... ", end="")
+        print(f"\nCreating invalidation for all files in distribution {distribution_id}", end="")
         response = cf_client.create_invalidation(
                         DistributionId=distribution_id,
-                        InvalidationBatch={ 'Paths': "/*" }
+                        InvalidationBatch={ 'Paths': {
+                            "Quantity": 1, 
+                            "Items": ["/*"] },
+                            "CallerReference": str(time.time())
+                        }
                         )
-        print("Done!")
+        print(" Done!")
         print("\nWaiting for invalidation to complete... ", end="")
         waiter = cf_client.get_waiter('invalidation_completed')
         waiter.wait(DistributionId=distribution_id,

@@ -69,4 +69,6 @@ if __name__ == '__main__':
     data = utils.load_yaml(args.data)
     if args.production:
         data['options']['production'] = True
+    else:
+        data['options']['production'] = False
     build(data)
