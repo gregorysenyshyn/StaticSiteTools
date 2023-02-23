@@ -14,9 +14,14 @@ except ImportError:
 def createEmailList(client):
     list_name = input("List name: ")
     list_description = input("List Description (private): ")
+    topics = []
+    topics.append({'TopicName': "test",
+                   'DisplayName': "test",
+                   'Description': "Test Emails",
+                   'DefaultSubscriptionStatus': "OPT_OUT"})
     add_topic_answer = input("Add one or more topics? (y/n): ")
     if add_topic_answer == 'y':
-        topics = get_topics()
+        topics = add_topic(topics)
     response = client.create_contact_list(ContactListName=list_name,
                                           Topics=topics,
                                           Description=list_description)
@@ -25,15 +30,13 @@ def createEmailList(client):
     else:
         print(response)
 
-def get_topics(topics=None):
-    if not topics:
-        topics = []
+def add_topic(topics):
     add_topic = True
     while add_topic is True:
         topic_name = input("Topic name: ")
         topic_display_name = input("Topic Display (public) Name: ")
         topic_description = input("Topic Description (public): ")
-        opt_in_default = input("Opt into topic by default? (y/n): ")
+        opt_in_default = input("Opt into topic by default? (Y/n): ")
         if opt_in_default == 'y':
             opt_in_default = 'OPT_IN'
         else:
@@ -42,7 +45,7 @@ def get_topics(topics=None):
                        'DisplayName': topic_display_name,
                        'Description': topic_description,
                        'DefaultSubscriptionStatus': opt_in_default})
-        another_topic = input("Add another topic? (y/n): ")
+        another_topic = input("Add another topic? (y/N): ")
         if another_topic != 'y':
             add_topic = False
     return topics
@@ -107,7 +110,7 @@ if __name__ == '__main__':
     if contact_list_name is not None:
         print("###########################")
         print(f"\n\nYou already have a contact list named {contact_list_name}")
-        answer = "brand new" 
+        answer = "not zero" 
         while not answer == "0":
             print("\n\n###########################")
 
@@ -120,11 +123,11 @@ if __name__ == '__main__':
                     print(f"{new_email} already on list!")
 
             elif answer == '2':
-                print("you haven't written this yet")
-                # new_topic = input("New topic name?")
-                # topics = get_topics(topics)
-                # ses_client.update_contact_list(ContactListName=contact_list_name,
-                #                                Topics=topics)
+                topics = ses_client.get_contact_list(
+                                       ContactListName=contact_list_name)["Topics"]
+                topics = add_topic(topics)
+                ses_client.update_contact_list(ContactListName=contact_list_name,
+                                               Topics=topics)
 
             elif answer == '3':
                 email = input("email address to check for? ")

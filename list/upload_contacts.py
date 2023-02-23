@@ -33,6 +33,7 @@ def import_simple(csv_reader, options):
             time.sleep(1)
         except ses_client.exceptions.AlreadyExistsException:
             print(f"Contact for {email} already exists!")
+    print("Finished Successfully!")
 
 
 def upload_contacts(csv_name, csv_format, options):
