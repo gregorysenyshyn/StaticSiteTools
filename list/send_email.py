@@ -109,15 +109,18 @@ def get_contacts(ses_client, list_name, topic, next_token):
                       "TopicFilter": {
                           "TopicName": topic,
                           "UseDefaultIfPreferenceUnavailable": False}}
+    print("Getting Contacts... ", end="")
     if next_token:
         response = ses_client.list_contacts(ContactListName=list_name,
                                             Filter=filter_params,
                                             PageSize=14,
                                             NextToken=next_token)
+        print("but wait!  There's more!")
     else:
         response = ses_client.list_contacts(ContactListName=list_name,
                                             Filter=filter_params,
                                             PageSize=14)
+        print("That's all the contacts I have!")
     if "NextToken" in response:
         return (response["Contacts"], response["NextToken"])
     else:
@@ -125,7 +128,6 @@ def get_contacts(ses_client, list_name, topic, next_token):
 
 
 def send_email(ses_client, list_options, list_name, contacts, content, topic):
-    t1 = time.time()
     print("Sending emails to:")
     for contact in contacts:
         print(contact)
@@ -138,9 +140,6 @@ def send_email(ses_client, list_options, list_name, contacts, content, topic):
                         ConfigurationSetName=list_options["config_set"],
                         ListManagementOptions={'ContactListName': list_name,
                                                'TopicName': topic})
-    sleep_time = 1-((time.time() - t1)/60)
-    print(f"Sleeping for {sleep_time} seconds")
-    time.sleep(sleep_time)
 
 
 def send_email_to_topic(ses_client, list_options, list_name, 
@@ -161,8 +160,13 @@ def send_email_to_topic(ses_client, list_options, list_name,
             print(f"Adding {contact_email} to batch")
             contacts.append(contact_email)
         if len(contacts) > 0:
+            t1 = time.time()
             send_email(ses_client, list_options, list_name,
                        contacts, content, topic)
+            sleep_time = 1-((time.time() - t1)/60)
+            print(f"Sleeping for {sleep_time} seconds")
+            time.sleep(sleep_time)
+            print("OK... I'm awake!")
 
         if not next_token:
             loop = False
@@ -176,11 +180,11 @@ def menu(data):
                                        "Please set one up with setup.py")
 
     answer = "not zero" 
-    topic = "test"
+    topic = None
     while not answer == "0":
         print(f"""\n\n### Menu ###
-                  \n\n1. Send email w/ new template
-                  \n\n2. Send email w/ existing template
+                  \n\n1. Send test email 
+                  \n\n2. Send email to topic
                   \n\n3. Change Topic (Currently: {topic})
                   \n\n4. Create Template
                   \n\n5. Delete Template
@@ -197,8 +201,9 @@ def menu(data):
             print("\n\nPlease choose a template: ")
             list_templates(ses_client)
             template_name = input("Template name? ")
-            send_email_to_topic(ses_client, list_options, contact_list_name, 
-                               template_name, topic)
+            if template_name:
+                send_email_to_topic(ses_client, list_options, contact_list_name, 
+                                    template_name, topic)
         elif answer == "3":
             topics = list_topics(ses_client, contact_list_name)
             topic = input("Which topic number? ")
