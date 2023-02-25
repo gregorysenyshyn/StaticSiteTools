@@ -14,9 +14,10 @@ except ImportError:
 def createEmailList(client):
     list_name = input("List name: ")
     list_description = input("List Description (private): ")
+    topics = []
     add_topic_answer = input("Add one or more topics? (y/n): ")
     if add_topic_answer == 'y':
-        topics = get_topics()
+        topics = add_topic(topics)
     response = client.create_contact_list(ContactListName=list_name,
                                           Topics=topics,
                                           Description=list_description)
@@ -25,15 +26,13 @@ def createEmailList(client):
     else:
         print(response)
 
-def get_topics(topics=None):
-    if not topics:
-        topics = []
+def add_topic(topics):
     add_topic = True
     while add_topic is True:
         topic_name = input("Topic name: ")
         topic_display_name = input("Topic Display (public) Name: ")
         topic_description = input("Topic Description (public): ")
-        opt_in_default = input("Opt into topic by default? (y/n): ")
+        opt_in_default = input("Opt into topic by default? (Y/n): ")
         if opt_in_default == 'y':
             opt_in_default = 'OPT_IN'
         else:
@@ -42,7 +41,7 @@ def get_topics(topics=None):
                        'DisplayName': topic_display_name,
                        'Description': topic_description,
                        'DefaultSubscriptionStatus': opt_in_default})
-        another_topic = input("Add another topic? (y/n): ")
+        another_topic = input("Add another topic? (y/N): ")
         if another_topic != 'y':
             add_topic = False
     return topics
@@ -93,46 +92,39 @@ def add_simulator_emails():
         make_list_entry(client, list_name, email)
 
 
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data', help='YAML data file', required=True)
-    args = parser.parse_args()
-    data = utils.load_yaml(args.data)
-
+def menu(data):
     ses_client = client.get_client('sesv2', data["options"])
-    contact_list_name = None
-    contact_list_name = utils.get_list_name(ses_client)
+    list_name = utils.get_list_name(ses_client)
 
-    if contact_list_name is not None:
+    if list_name is not None:
         print("###########################")
-        print(f"\n\nYou already have a contact list named {contact_list_name}")
-        answer = "brand new" 
+        print(f"\n\nYou already have a contact list named {list_name}")
+        answer = "not zero" 
         while not answer == "0":
             print("\n\n###########################")
 
             if answer == '1':
                 new_email = input("email address: ")
                 try:
-                    ses_client.create_contact(ContactListName=contact_list_name,
+                    ses_client.create_contact(ContactListName=list_name,
                                               EmailAddress=new_email)
                 except ses_client.exceptions.AlreadyExistsException:
                     print(f"{new_email} already on list!")
 
             elif answer == '2':
-                print("you haven't written this yet")
-                # new_topic = input("New topic name?")
-                # topics = get_topics(topics)
-                # ses_client.update_contact_list(ContactListName=contact_list_name,
-                #                                Topics=topics)
+                topics = ses_client.get_contact_list(
+                                       ContactListName=list_name)["Topics"]
+                topics = add_topic(topics)
+                ses_client.update_contact_list(ContactListName=list_name,
+                                               Topics=topics)
 
             elif answer == '3':
                 email = input("email address to check for? ")
-                check_list_entry(ses_client, contact_list_name, email)
+                check_list_entry(ses_client, list_name, email)
 
             elif answer == '4':
                 topics = ses_client.get_contact_list(
-                                       ContactListName=contact_list_name)["Topics"]
+                                       ContactListName=list_name)["Topics"]
                 for item in topics:
                     print(item)
 
@@ -145,19 +137,46 @@ if __name__ == '__main__':
                 elif direction == 'o':
                     direction = "OPT_OUT"
                 ses_client.update_contact(
-                        ContactListName=contact_list_name,
+                        ContactListName=list_name,
                         EmailAddress=email,
                         TopicPreferences=[{
                             "TopicName": topic,
                             "SubscriptionStatus": direction
                             }]
                         )
+            elif answer == '6':
+                print("Current Topics:\n")
+                response = ses_client.get_contact_list(
+                                       ContactListName=list_name)
+                topics = response["Topics"]
+                for topic in topics:
+                    print(f"{topic['TopicName']}")
 
-            print("""\n\nAdd:\n1. New Contact\n2. New Topic
+                topic_to_delete = input("Delete which topic? ")
+                new_topics = [topic for topic in topics if topic["TopicName"] != topic_to_delete]
+                ses_client.update_contact_list(ContactListName=list_name,
+                                               Topics=new_topics)
+                print("Done!")
+
+
+            print("""### Menu
+                  \n\nAdd:\n1. New Contact\n2. New Topic
                   \n\nDisplay:\n3. Contact Info\n4. Topics
                   \n\nChange:\n5. Topic Opt-In
+                  \n\nDelete:\n6. Topic 
                   \n\n0. Quit\n\n""")
             answer = input("Your choice: ")
     else:
-        createEmailList(ses_client)
+        create_answer = input("Create new email list? (Y/n) ")
+        if not create_answer == 'n':
+            createEmailList(ses_client)
 
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data', help='YAML data file', required=True)
+    args = parser.parse_args()
+    data = utils.load_yaml(args.data)
+
+    menu(data)
