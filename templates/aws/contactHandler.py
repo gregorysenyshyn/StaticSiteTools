@@ -2,12 +2,9 @@ import os
 import json
 import boto3
 import traceback
-from urllib import request
-from urllib.parse import parse_qs, urlencode
+from urllib.parse import parse_qs 
 
 """
-Lambda Proxy
-
 Environment Variables:
 
 VERIFIED_EMAIL
@@ -16,7 +13,7 @@ THANK_YOU_ADDRESS
 ERROR_ADDRESS
 """
 
-def send_email(body):
+def send_email(name, phone, email, reason, message):
     client = boto3.client('sesv2')
     response = client.send_email(
         FromEmailAddress=os.environ['VERIFIED_EMAIL'],
@@ -26,17 +23,17 @@ def send_email(body):
             os.environ['VERIFIED_EMAIL']
         ]},
       ReplyToAddresses=[
-          body["email"][0].replace(" ", "")
+          email.replace(" ", "")
         ],
         Content={
             'Simple': {
                 'Subject': {
-                    'Data': f'Ontario Literacy contact form: {body["reason"][0]}', 
+                    'Data': f'École Violet contact form: {reason}', 
                     'Charset': 'UTF-8'
                 },
                 'Body': {
                     'Text': {
-                        'Data': f"Message from {body['name'][0]} - {body['phone'][0]}\n{body['message'][0]}",
+                        'Data': f"Message from {name} - {phone}\n{message}",
                         'Charset': 'UTF-8'}
                 }
             }
@@ -46,7 +43,19 @@ def send_email(body):
 def lambda_handler(event, context):
     try:
         body = parse_qs(event["body"], strict_parsing=True)
-        send_email(body)
+        name, phone, email, reason, message = "Not Provided"
+        if "name" in body:
+            name = body["name"][0]
+        if "phone" in body:
+            phone = body["phone"][0]
+        if "email" in body:
+            email = body["email"][0]
+        if "reason" in body:
+            reason = body["reason"][0]
+        if "message" in body:
+            message = body["message"][0]
+            
+        send_email(name, phone, email, reason, message)
         return {
             'statusCode': 302,
             'headers': {
@@ -55,6 +64,7 @@ def lambda_handler(event, context):
     }
         return {'statusCode': 200, 'body': 'message sent'}
         
+
     except Exception as err:
         print(traceback.print_exc())
         return {
@@ -64,4 +74,5 @@ def lambda_handler(event, context):
             },
             'body': json.dumps("That's a problem!")
         }
+
 
