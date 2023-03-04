@@ -104,7 +104,7 @@ def menu(data):
             print("\n\n###########################")
 
             if answer == '1':
-                new_email = input("email address: ")
+                new_email = input("email address: ").lower()
                 try:
                     ses_client.create_contact(ContactListName=list_name,
                                               EmailAddress=new_email)
@@ -119,7 +119,7 @@ def menu(data):
                                                Topics=topics)
 
             elif answer == '3':
-                email = input("email address to check for? ")
+                email = input("email address to check for? ").lower()
                 check_list_entry(ses_client, list_name, email)
 
             elif answer == '4':
@@ -161,7 +161,7 @@ def menu(data):
 
             print("""### Menu
                   \n\nAdd:\n1. New Contact\n2. New Topic
-                  \n\nDisplay:\n3. Contact Info\n4. Topics
+                  \n\nManage:\n3. Contact Info\n4. Topics
                   \n\nChange:\n5. Topic Opt-In
                   \n\nDelete:\n6. Topic 
                   \n\n0. Quit\n\n""")
