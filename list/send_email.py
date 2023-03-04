@@ -133,9 +133,6 @@ def send_email(ses_client, list_options, list_name, contacts,
                template_name, topic):
     content = {"Template": {'TemplateName': template_name,
                             'TemplateData': '{}'}}
-    print("Sending emails to:")
-    for contact in contacts:
-        print(contact)
     response = ses_client.send_email(
                         FromEmailAddress=list_options["email_address"],
                         FromEmailAddressIdentityArn=list_options["email_arn"],
