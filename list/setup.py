@@ -26,6 +26,7 @@ def createEmailList(client):
     else:
         print(response)
 
+
 def add_topic(topics):
     add_topic = True
     while add_topic is True:
@@ -45,6 +46,7 @@ def add_topic(topics):
         if another_topic != 'y':
             add_topic = False
     return topics
+
 
 def make_list_entry(ses_client, list_name, email):
     try:
@@ -71,13 +73,12 @@ def check_list_entry(ses_client, list_name, email):
         print(e)
 
 
-
 def add_simulator_emails():
     identity = input("Which AWS credentials? ")
-    client = boto3.Session(profile_name=identity, region_name="us-east-1").client("sesv2")
-    list_name = get_list_name(client)
+    ses_client = boto3.Session(profile_name=identity, region_name="us-east-1").client("sesv2")
+    list_name = utils.get_list_name(ses_client)
     print('\nExisting Addresses')
-    response = client.list_contacts(ContactListName=list_name)
+    response = ses_client.list_contacts(ContactListName=list_name)
     for contact in response['Contacts']:
         print(contact['EmailAddress'])
     answer = input("Add emails?\n1. AWS Simulator\n2. Another email")
@@ -86,10 +87,56 @@ def add_simulator_emails():
         simulator_emails = ["bounce@simulator.amazonses.com",
                             "complaint@simulator.amazonses.com"]
         for email in simulator_emails:
-            make_list_entry(client, list_name, email)
+            make_list_entry(ses_client, list_name, email)
     elif answer == "2":
         new_email = input("email address to add? ")
-        make_list_entry(client, list_name, email)
+        make_list_entry(ses_client, list_name, email)
+
+
+def export_list():
+    import csv
+
+    ses_client = boto3.Session(profile_name=data["options"]["aws_profile_name"],
+                               region_name="us-east-1").client("sesv2")
+    list_name = utils.get_list_name(ses_client)
+    response = ses_client.list_contacts(ContactListName=list_name,
+                                                 Filter={
+                                                     "FilteredStatus": "OPT_IN",
+                                                     "TopicFilter": {
+                                                         "TopicName": "now-playing",
+                                                         "UseDefaultIfPreferenceUnavailable": True
+                                                         }
+                                                     }
+                                                 )
+    contacts = response["Contacts"]
+    next_token = response["NextToken"]
+    count = 0
+    while next_token:
+        response = ses_client.list_contacts(ContactListName=list_name,
+                                            Filter={
+                                                "FilteredStatus": "OPT_IN",
+                                                "TopicFilter": {
+                                                    "TopicName": "now-playing",
+                                                    "UseDefaultIfPreferenceUnavailable": True
+                                                    }
+                                                },
+                                            NextToken=next_token
+                                           )
+        if "NextToken" in response:
+            next_token = response["NextToken"]
+        else:
+            next_token = None
+        count += len(response["Contacts"])
+        print(f"Got {len(response['Contacts'])} Contacts - {count} total")
+        contacts.extend(response["Contacts"])
+    with open('export.csv', 'w', newline='') as f:
+        csvwriter = csv.writer(f)
+        for contact in contacts:
+            print(f"Writing {contact['EmailAddress']}")
+            csvwriter.writerow([contact["EmailAddress"]])
+
+
+
 
 
 def menu(data):
