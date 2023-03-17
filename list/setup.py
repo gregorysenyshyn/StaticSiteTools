@@ -21,10 +21,7 @@ def createEmailList(client):
     response = client.create_contact_list(ContactListName=list_name,
                                           Topics=topics,
                                           Description=list_description)
-    if response['ResponseMetaData']['HTTPStatusCode'] == '200':
-        print('List Created Successfully!')
-    else:
-        print(response)
+    print('List Created Successfully!')
 
 
 def add_topic(topics):
@@ -141,7 +138,11 @@ def export_list():
 
 def menu(data):
     ses_client = client.get_client('sesv2', data["options"])
-    list_name = utils.get_list_name(ses_client)
+    list_name = None
+    try:
+        list_name = utils.get_list_name(ses_client)
+    except Exception as e:
+        print(e)
 
     if list_name is not None:
         print("###########################")
