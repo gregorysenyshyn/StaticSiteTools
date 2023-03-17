@@ -1,14 +1,26 @@
-options:
-  aws_profile_name: default
-  aws_region_name: us-east-1
-  s3_bucket: S3_BUCKET_NAME 
+
   dist: dist
   images: images
+  s3_bucket: website.com 
   htaccess: src/apache/.htaccess
+  aws_profile_name: default
+  aws_region_name: us-east-1
   google_ads_id: ""
   analytics_id: ""
-  recaptcha_sitekey: ''
+  recaptcha_sitekey: ""
   cache_control_age: 259200
+
+
+contact_form:
+  email_address: contact
+  error_page: error
+  thank_you_page: thank-you
+
+
+list:
+  email_address: "Greg Senyshyn <contact@website.com>"
+  email_arn: ""
+  config_set: engagement
 
 
 js:
