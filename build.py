@@ -18,12 +18,14 @@ def build(data):
     print(' Done!')
 
     print('\n\n=== J S ===')
-    for dest_path in data['js']['paths']:
-        tools.handle_js(data, dest_path)
+    if 'js' in data:
+        for dest_path in data['js']['paths']:
+            tools.handle_js(data, dest_path)
 
     print('\n\n=== C S S ===')
-    for dest_path in data['scss']['paths']:
-        tools.handle_scss(data, dest_path)
+    if 'scss' in data:
+        for dest_path in data['scss']['paths']:
+            tools.handle_scss(data, dest_path)
 
     print('\n\n=== H T M L ===')
     t1 = time.time()
@@ -36,6 +38,11 @@ def build(data):
 
     print('\n\n=== A U D I O ===')
     tools.handle_audio(data['options'])
+
+    print('\n\n=== C O P Y ===')
+    if 'copy' in data:
+        tools.copy_files(data['copy'])
+    
 
     print('\n\n=== M I S C ===')
     if not data['options']['production']:
