@@ -12,6 +12,7 @@ from jinja2 import Environment
 import yaml
 import sass
 import mistune
+from mistune.directives import RSTDirective, TableOfContents
 import frontmatter
 
 
@@ -204,7 +205,9 @@ def handle_audio(options):
 
 
 def markdown_filter(text):
-    return mistune.html(text)
+    markdown = mistune.create_markdown(
+    plugins=[RSTDirective([TableOfContents()])])
+    return markdown(text)
 
 
 def get_j2_env(pageset):
