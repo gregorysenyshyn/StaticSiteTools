@@ -43,7 +43,11 @@ def send_email(name, phone, email, reason, message):
 def lambda_handler(event, context):
     try:
         body = parse_qs(event["body"], strict_parsing=True)
-        name, phone, email, reason, message = "Not Provided"
+        name = "Not Provided"
+        phone = "Not Provided"
+        email = "Not Provided"
+        reason = "Not Provided"
+        message = "Not Provided"
         if "name" in body:
             name = body["name"][0]
         if "phone" in body:
