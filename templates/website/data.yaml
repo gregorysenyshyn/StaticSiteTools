@@ -1,14 +1,13 @@
-
-  dist: dist
-  images: images
-  s3_bucket: website.com 
-  htaccess: src/apache/.htaccess
-  aws_profile_name: default
-  aws_region_name: us-east-1
-  google_ads_id: ""
-  analytics_id: ""
-  recaptcha_sitekey: ""
-  cache_control_age: 259200
+dist: dist
+images: images
+s3_bucket: website.com 
+htaccess: src/apache/.htaccess
+aws_profile_name: default
+aws_region_name: us-east-1
+google_ads_id: ""
+analytics_id: ""
+recaptcha_sitekey: ""
+cache_control_age: 259200
 
 
 contact_form:
