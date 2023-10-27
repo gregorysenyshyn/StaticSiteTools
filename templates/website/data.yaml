@@ -1,4 +1,4 @@
-
+options:
   dist: dist
   images: images
   s3_bucket: website.com 
