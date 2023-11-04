@@ -341,10 +341,10 @@ def build_pageset(pageset, options):
             page['data']['analytics_id'] = options['analytics_id']
         if 'google_ads_id' in options:
             page['data']['google_ads_id'] = options['google_ads_id']
+        if 'recaptcha_sitekey' in options:
+            page['data']['recaptcha_sitekey'] = options['recaptcha_sitekey']
 
         # pageset options
-        if 'recaptcha' in pageset['options']:
-            page['data']['recaptcha_sitekey'] = options['recaptcha_sitekey']
         if 'nav' in pageset['options']:
             page['data']['nav_pages'] = nav_pages
 
