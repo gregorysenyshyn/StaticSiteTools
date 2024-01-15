@@ -36,10 +36,12 @@ def set_up_contact_form(cf_data, options):
 def set_up_email_address(email_address):
     sesv2_client = get_client('sesv2', options)
     pass
+    # TODO
 
 
 def check_dkim(response, options):
     tokens = response['DkimAttributes']['Tokens']
+    # TODO
 
 
 
