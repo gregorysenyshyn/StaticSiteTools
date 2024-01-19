@@ -192,6 +192,7 @@ def menu(data):
                             "SubscriptionStatus": direction
                             }]
                         )
+
             elif answer == '6':
                 print("Current Topics:\n")
                 response = ses_client.get_contact_list(

@@ -70,6 +70,14 @@ a {
   height: auto;
 }
 
+button {
+  &:hover{
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: scale(0.98);
+  }
+}
 
 #video-row {
   display: flex;

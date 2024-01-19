@@ -15,6 +15,10 @@ def get_list_name(ses_client):
     response = ses_client.list_contact_lists()
     return response["ContactLists"][0]["ContactListName"]
 
+def get_ddb_tables(ddb_client):
+    response = ddb_client.list_tables()
+    return response['TableNames']
+
 
 if __name__ == '__main__':
 
