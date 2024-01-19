@@ -26,20 +26,43 @@ def list_topics(ses_client, list_name):
 def list_templates(ses_client, next_token=None):
     if next_token is None:
         response = ses_client.list_email_templates()
+        print("\n\nTemplates Available:")
     else:
         response = ses_client.list_email_templates(NextToken=next_token)
-    if next_token is None:
-        print("\n\nCurrent Templates:")
-    templates = response["TemplatesMetadata"]
+    avail_templates = response["TemplatesMetadata"]
     if "NextToken" in response:
         next_token = response["NextToken"]
-    for template in templates:
+    for template in avail_templates:
         print(f'{template["TemplateName"]}')
         if next_token is not None:
             next_answer = input("\nThere are more templates.  See more? (Y/n) ")
-            if next_answer != "n":
+            if not next_answer == "n":
                 print("\n")
                 list_templates(ses_client, next_token)
+
+
+def change_template(ses_client, templates):
+    list_templates(ses_client)
+    print("\n\nTemplates Currently Selected:")
+    for template in templates:
+        print(template)
+    template_answer = "not zero"
+
+    while not template_answer == "0":
+        print("\n1. Add Template to Selection")
+        print("\n2. Remove Template from Selection")
+        print("\n3. List templates")
+        print("\n0. Quit")
+        template_answer = input("Your Choice? ")
+        if template_answer == "1":
+            new_template = input("Template name to add? ")
+            templates.append(new_template)
+        elif template_answer == "2":
+            template_to_remove = input("Template name to remove? ")
+            templates = [item for (index, item) in enumerate(templates
+                                                             ) if not item == template_to_remove]
+        elif template_answer == "3":
+            list_templates(ses_client)
 
 
 def create_template(ses_client):
@@ -89,10 +112,10 @@ def create_template(ses_client):
         if not template_name:
             template_name = "temp"
         ses_client.create_email_template(TemplateName=template_name,
-                                            TemplateContent={
-                                                'Subject': subject_string,
-                                                'Text': txt_string,
-                                                'Html': html_string })
+                                         TemplateContent={
+                                             'Subject': subject_string,
+                                             'Text': txt_string,
+                                             'Html': html_string })
         print("Template Uploaded!\n") 
         return template_name
 
@@ -113,14 +136,11 @@ def get_contacts(ses_client, list_name, topic, next_token):
                           "UseDefaultIfPreferenceUnavailable": True}}
     print("Getting Contacts... ", end="")
     if next_token:
-        response = ses_client.list_contacts(ContactListName=list_name,
-                                            Filter=filter_params,
-                                            PageSize=14,
-                                            NextToken=next_token)
+        response = ses_client.list_contacts(ContactListName=list_name, Filter=filter_params,
+                                            PageSize=14, NextToken=next_token)
         print("but wait!  There's more!")
     else:
-        response = ses_client.list_contacts(ContactListName=list_name,
-                                            Filter=filter_params,
+        response = ses_client.list_contacts(ContactListName=list_name, Filter=filter_params,
                                             PageSize=14)
         print("That's all the contacts I have!")
     if "NextToken" in response:
@@ -129,36 +149,53 @@ def get_contacts(ses_client, list_name, topic, next_token):
         return (response["Contacts"], None)
 
 
-def send_email(ses_client, list_options, list_name, contacts,
-               template_name, topic):
+def check_config_set(ses_client, template_name):
+    try:
+        response = ses_client.get_configuration_set(ConfigurationSetName=template_name)
+    except ses_client.exceptions.NotFoundException:
+        ses_client.create_configuration_set(
+                ConfigurationSetName=template_name,
+                ReputationOptions={'ReputationMetricsEnabled': True },
+                SendingOptions={'SendingEnabled': True},
+                SuppressionOptions={'SuppressedReasons': ['BOUNCE', 'COMPLAINT']})
+
+
+def send_email(ses_client, list_options, list_name, contacts, template_name, topic):
     content = {"Template": {'TemplateName': template_name,
                             'TemplateData': '{}'}}
+    check_config_set(ses_client, template_name)
     response = ses_client.send_email(
                         FromEmailAddress=list_options["email_address"],
                         FromEmailAddressIdentityArn=list_options["email_arn"],
                         Destination={'ToAddresses': contacts},
                         ReplyToAddresses=[list_options["email_address"]],
                         Content=content,
-                        ConfigurationSetName=list_options["config_set"],
+                        ConfigurationSetName=config_set,
                         ListManagementOptions={'ContactListName': list_name,
                                                'TopicName': topic})
 
 
-def send_email_to_topic(ses_client, list_options, list_name, 
-                        template_name, topic):
+def send_email_to_topic(ses_client, list_options, list_name, templates, topic):
 
     contact_email = list_options["email_address"]
 
     loop = True
     next_token = None
+    template_index = 0
     while loop:
-        raw_contacts, next_token = get_contacts(ses_client, list_name, 
-                                                topic, next_token)
+
+        raw_contacts, next_token = get_contacts(ses_client, list_name, topic, next_token)
         for contact in raw_contacts:
+
             contact_email = contact["EmailAddress"]
             print(f"Sending email to {contact_email}")
-            send_email(ses_client, list_options, list_name,
-                       [contact_email], template_name, topic)
+            send_email(ses_client, list_options, list_name, [contact_email], 
+                       templates[template_index], topic)
+
+            if template_index == len(templates) - 1:
+                template_index = 0
+            else:
+                template_index += 1
 
         if not next_token:
             loop = False
@@ -173,23 +210,28 @@ def menu(data):
 
     answer = "not zero" 
     topic = None
-    template = None
+    templates = []
     while not answer == "0":
-        print(f"""\n\n### Menu ###
-                  \n\n1. Send test email 
-                  \n\n2. Send email to topic
-                  \n\n3. Change Topic (Currently: {topic})
-                  \n\n4. Change Template (Currently: {template})
-                  \n\n5. Create Template
-                  \n\n6. Delete Template
-                  \n\n0. Quit\n\n""")
+        print(f"\n\n### Current Selections ###")
+        print(f"\nCurrent Topic: {topic}")
+        print("Current Templates:")
+        for i in range(len(templates)):
+            print(templates[i])
+        print("""\n\n### Menu ###
+                 \n\n1. Send manual email 
+                 \n\n2. Send email to topic
+                 \n\n3. Change Topic
+                 \n\n4. Change Templates
+                 \n\n5. Upload Template
+                 \n\n6. Delete Template
+                 \n\n0. Quit\n\n""")
         answer = input("Your choice: ")
         print("\n\n")
         if answer == "1":
             print("Topic is only for list management validation, not sending.")
             contacts = input("Test email address: ")
-            send_email(ses_client, list_options, contact_list_name, 
-                                [contacts], template, topic)
+            send_email(ses_client, list_options, contact_list_name, [contacts],
+                       templates[0], topic)
         if answer == "2":
             if template and topic:
                 send_email_to_topic(ses_client, list_options, contact_list_name, 
@@ -201,9 +243,7 @@ def menu(data):
             topic = input("Which topic number? ")
             topic = topics[int(topic)]["TopicName"]
         elif answer == "4":
-            print("\n\nPlease choose a template: ")
-            list_templates(ses_client)
-            template = input("Template name? ")
+            templates = change_templates(ses_client, templates)
         elif answer == "5":
             create_template(ses_client)
         elif answer == "6":

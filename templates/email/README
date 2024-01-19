@@ -1,2 +1,0 @@
-Use ListManagmentOptions when doing SendEmail, and make sure that the tag {{amazonSESUnsubscribeUrl}}
-is in the email
