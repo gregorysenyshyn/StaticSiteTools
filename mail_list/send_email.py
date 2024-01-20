@@ -41,19 +41,22 @@ def list_templates(ses_client, next_token=None):
                 list_templates(ses_client, next_token)
 
 
-def change_template(ses_client, templates):
+def change_templates(ses_client, templates):
     list_templates(ses_client)
     print("\n\nTemplates Currently Selected:")
-    for template in templates:
-        print(template)
+    if templates: 
+        for template in templates:
+            print(template)
+    else: 
+        print("None selected")
     template_answer = "not zero"
 
     while not template_answer == "0":
         print("\n1. Add Template to Selection")
         print("\n2. Remove Template from Selection")
-        print("\n3. List templates")
+        print("\n3. Available Templates")
         print("\n0. Quit")
-        template_answer = input("Your Choice? ")
+        template_answer = input("\nYour Choice? ")
         if template_answer == "1":
             new_template = input("Template name to add? ")
             templates.append(new_template)
@@ -170,7 +173,7 @@ def send_email(ses_client, list_options, list_name, contacts, template_name, top
                         Destination={'ToAddresses': contacts},
                         ReplyToAddresses=[list_options["email_address"]],
                         Content=content,
-                        ConfigurationSetName=config_set,
+                        ConfigurationSetName=template_name,
                         ListManagementOptions={'ContactListName': list_name,
                                                'TopicName': topic})
 
@@ -215,8 +218,9 @@ def menu(data):
         print(f"\n\n### Current Selections ###")
         print(f"\nCurrent Topic: {topic}")
         print("Current Templates:")
-        for i in range(len(templates)):
-            print(templates[i])
+        if templates:
+            for i in range(len(templates)):
+                print(templates[i])
         print("""\n\n### Menu ###
                  \n\n1. Send manual email 
                  \n\n2. Send email to topic
@@ -228,8 +232,15 @@ def menu(data):
         answer = input("Your choice: ")
         print("\n\n")
         if answer == "1":
+            if topic is None:
+                print("Please add a topic!")
+                return
             print("Topic is only for list management validation, not sending.")
             contacts = input("Test email address: ")
+            if len(templates) < 1:
+                print("No template! Please select a template!")
+                return
+
             send_email(ses_client, list_options, contact_list_name, [contacts],
                        templates[0], topic)
         if answer == "2":
@@ -243,7 +254,7 @@ def menu(data):
             topic = input("Which topic number? ")
             topic = topics[int(topic)]["TopicName"]
         elif answer == "4":
-            templates = change_templates(ses_client, templates)
+            change_templates(ses_client, templates)
         elif answer == "5":
             create_template(ses_client)
         elif answer == "6":
