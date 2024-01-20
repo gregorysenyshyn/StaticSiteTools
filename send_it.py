@@ -1,11 +1,12 @@
+import boto3
+from botocore.exceptions import ClientError
+
 import os
 import glob
 import json
 import time
 import argparse
 
-import boto3
-from botocore.exceptions import ClientError
 
 from shared import utils
 from shared.client import get_client
