@@ -11,16 +11,16 @@ except ImportError:
     from shared import utils, client
 
 
-def createEmailList(client):
+def createEmailList(ses_client):
     list_name = input("List name: ")
     list_description = input("List Description (private): ")
     topics = []
     add_topic_answer = input("Add one or more topics? (y/n): ")
     if add_topic_answer == 'y':
         topics = add_topic(topics)
-    response = client.create_contact_list(ContactListName=list_name,
-                                          Topics=topics,
-                                          Description=list_description)
+    response = ses_client.create_contact_list(ContactListName=list_name,
+                                              Topics=topics,
+                                              Description=list_description)
     print('List Created Successfully!')
 
 
@@ -47,16 +47,16 @@ def add_topic(topics):
 
 def make_list_entry(ses_client, list_name, email):
     try:
-        print(client.create_contact(ContactListName = list_name,
-                                    EmailAddress = email))
-    except:
+        ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
+        print(f"{email} added!")
+    except Exception as e:
         print(f"{email} already on list!")
+        print(e)
 
 
 def check_list_entry(ses_client, list_name, email):
-    response = ses_client.get_contact(ContactListName = list_name,
-                                      EmailAddress = email)
     try:
+        response = ses_client.get_contact(ContactListName = list_name, EmailAddress = email)
         print(f"\n\nemail: {response['EmailAddress']}")
         if 'TopicPreferences' in response:
             for topic in response['TopicPreferences']:
@@ -66,7 +66,6 @@ def check_list_entry(ses_client, list_name, email):
                 print(f"{topic['TopicName']}: {topic['SubscriptionStatus']}")
         print(f"Unsubscribe All: {response['UnsubscribeAll']}")
     except Exception as e:
-        print(response)
         print(e)
 
 
@@ -74,11 +73,7 @@ def add_simulator_emails():
     identity = input("Which AWS credentials? ")
     ses_client = boto3.Session(profile_name=identity, region_name="us-east-1").client("sesv2")
     list_name = utils.get_list_name(ses_client)
-    print('\nExisting Addresses')
-    response = ses_client.list_contacts(ContactListName=list_name)
-    for contact in response['Contacts']:
-        print(contact['EmailAddress'])
-    answer = input("Add emails?\n1. AWS Simulator\n2. Another email")
+    answer = input("Add emails?\n1. AWS Simulator\n2. Another email\n\nYour Choice? ")
     if answer == "1":
         print('\nAdding Simulator Emails')
         simulator_emails = ["bounce@simulator.amazonses.com",
@@ -167,16 +162,19 @@ def menu(data):
                                                Topics=topics)
 
             elif answer == '3':
+                add_simulator_emails()
+
+            elif answer == '4':
                 email = input("email address to check for? ").lower()
                 check_list_entry(ses_client, list_name, email)
 
-            elif answer == '4':
+            elif answer == '5':
                 topics = ses_client.get_contact_list(
                                        ContactListName=list_name)["Topics"]
                 for item in topics:
                     print(item)
 
-            elif answer == '5':
+            elif answer == '6':
                 email = input("email address to check for? ")
                 topic = input("Topic to change? ")
                 direction = input("in or out? (i/o) ")
@@ -193,7 +191,7 @@ def menu(data):
                             }]
                         )
 
-            elif answer == '6':
+            elif answer == '7':
                 print("Current Topics:\n")
                 response = ses_client.get_contact_list(
                                        ContactListName=list_name)
@@ -209,10 +207,10 @@ def menu(data):
 
 
             print("""### Menu
-                  \n\nAdd:\n1. New Contact\n2. New Topic
-                  \n\nManage:\n3. Contact Info\n4. Topics
-                  \n\nChange:\n5. Topic Opt-In
-                  \n\nDelete:\n6. Topic 
+                  \n\nAdd:\n1. New Contact\n2. New Topic\n3. Simulator Emails
+                  \n\nManage:\n4. Contact Info\n5. Topics
+                  \n\nChange:\n6. Topic Opt-In
+                  \n\nDelete:\n7. Topic 
                   \n\n0. Quit\n\n""")
             answer = input("Your choice: ")
     else:
