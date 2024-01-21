@@ -244,9 +244,9 @@ def menu(data):
             send_email(ses_client, list_options, contact_list_name, [contacts],
                        templates[0], topic)
         if answer == "2":
-            if template and topic:
+            if templates and topic:
                 send_email_to_topic(ses_client, list_options, contact_list_name, 
-                                    template, topic)
+                                    templates, topic)
             else:
                 print("Please set template and topic first!")
         elif answer == "3":
