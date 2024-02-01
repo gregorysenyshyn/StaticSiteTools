@@ -335,14 +335,12 @@ def build_pageset(pageset, options):
     for page in pages:
 
         # global options
-        if 'production' in options and options['production']:
+        page['data']['analytics_id'] = options.get('analytics_id')
+        page['data']['google_ads_id'] = options.get('google_ads_id')
+        page['data']['recaptcha_sitekey'] = options.get('recaptcha_sitekey')
+        page['data']['api_url'] = options.get('api_url')
+        if options.get('production'):
             page['data']['production'] = True
-        if 'analytics_id' in options:
-            page['data']['analytics_id'] = options['analytics_id']
-        if 'google_ads_id' in options:
-            page['data']['google_ads_id'] = options['google_ads_id']
-        if 'recaptcha_sitekey' in options:
-            page['data']['recaptcha_sitekey'] = options['recaptcha_sitekey']
 
         # pageset options
         if 'nav' in pageset['options']:
