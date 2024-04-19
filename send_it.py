@@ -110,8 +110,9 @@ if __name__ == '__main__':
         print("\nGetting distribution ID...")
         response = cf_client.list_distributions()
         for item in response['DistributionList']['Items']:
-            if data['options']['s3_bucket'] in item['Aliases']['Items']:
-                distribution_id = item['Id']
+            if "Items" in item["Aliases"]:
+                if data['options']['s3_bucket'] in item['Aliases']['Items']:
+                    distribution_id = item['Id']
         print(f"\nCreating invalidation for all files in distribution {distribution_id}", end="")
         response = cf_client.create_invalidation(
                         DistributionId=distribution_id,

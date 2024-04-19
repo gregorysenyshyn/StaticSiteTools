@@ -251,11 +251,12 @@ def check_cdn_distribution(options):
     else:
         aliases = ""
         for item in response['DistributionList']['Items']:
-            for alias in item['Aliases']['Items']:
-                if (alias == options['s3_bucket'] or
-                    alias == f"www.{options['s3_bucket']}"):
-                    aliases += f'{alias} '
-                    distribution_arn = response['DistributionList']['Items'][0]['ARN']
+            if "Items" in item["Aliases"]:
+                for alias in item['Aliases']['Items']:
+                    if (alias == options['s3_bucket'] or
+                        alias == f"www.{options['s3_bucket']}"):
+                        aliases += f'{alias} '
+                        distribution_arn = response['DistributionList']['Items'][0]['ARN']
 
         if aliases:
             print(f'CDN distribution exists for {aliases}')
