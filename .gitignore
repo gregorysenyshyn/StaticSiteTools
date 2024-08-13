@@ -3,4 +3,4 @@ __pycache__/
 *~
 access.log
 error.log
-*DS_Store
+.DS_Store

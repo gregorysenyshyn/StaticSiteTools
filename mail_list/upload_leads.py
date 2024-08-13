@@ -21,17 +21,17 @@ def get_csv_data():
     csv_path = input('CSV file path: ')
     try:
         with open(csv_path, "r") as f:
-            reader = csv.reader(f)
+            reader = csv.reader(f, quoting=csv.QUOTE_NONNUMERIC)
             all_rows = list(reader)
             header = all_rows[0]
             rows = all_rows[1:]
+            print(rows)
     except Exception as e:
-        print("Error with file!")
-        get_csv_data()
+        print("Error with file!", e)
     print('\n\nField Names: ', header)
     field_name_answer = input('OK to continue? (Y/n) ')
     if field_name_answer == 'n':
-        get_csv_data()
+        raise Exception("Cancelled!")
     return (header, rows)
 
 def print_ddb_tables(ddb_client):
@@ -43,11 +43,15 @@ def upload_to_ddb(ddb_client, field_names, csv_data):
     print_ddb_tables(ddb_client)
     ddb_table = input('DynamoDB Table Name: ')
     for lead_data in csv_data:
+        print(lead_data)
         query_string = f"INSERT INTO \"{ddb_table}\" value {{"
         for i in range(0, len(field_names)):
-            query_string = (
-                        query_string + 
-                        f" '{field_names[i]}' : '{lead_data[i]}',")
+            if isinstance(lead_data[i], str):
+                query_string = (query_string + 
+                                f" '{field_names[i]}' : '{lead_data[i]}',")
+            elif isinstance(lead_data[i], (int, float, complex)):
+                query_string = (query_string + 
+                                f" '{field_names[i]}' : {lead_data[i]},")
         query_string = query_string[:-1] + "}"
         try:
             print(query_string)
@@ -59,19 +63,7 @@ def upload_to_ddb(ddb_client, field_names, csv_data):
                 print(f"VALIDATION ERROR! Item {lead_data} already exists!")
 
 
-def add_topic(list_name, topic_name, ses_client):
-    topic_display_name = input("Topic Display (public) Name: ")
-    topic_description = input("Topic Description (public): ")
-    orig_response = ses_client.get_contact_list(ContactListName=list_name)
-    orig_response["Topics"].append({'TopicName': topic_name,
-                                    'DisplayName': topic_display_name,
-                                    'Description': topic_description,
-                                    'DefaultSubscriptionStatus': 'OPT_OUT'})
-    ses_client.update_contact_list(ContactListName=list_name,
-                                   Topics=orig_response["Topics"])
-
-
-def add_ses_contact(contact, list_name, ses_client):
+def add_ses_contact(contact, list_name, ses_client, contact_attributes=None):
     try: 
         response = ses_client.create_contact(
                                 ContactListName=list_name,
@@ -83,19 +75,32 @@ def add_ses_contact(contact, list_name, ses_client):
     except ClientError as e:
         if e.response['Error']['Code'] == "BadRequestException":
             print(f"Topic {contact['topic']} not found.  Creating new topic.")
-            add_topic(list_name, contact['topic'], ses_client)
+            utils.add_topic(topics)
             add_ses_contact(contact, list_name, ses_client)
 
 
 def sync_with_ses(ddb_client):
+    # TODO Add topic selection and refine ddb scan query
     ses_client = client.get_client('sesv2', data["options"])
     list_name = utils.get_list_name(ses_client)
+    topics = ses_client.get_contact_list(
+                           ContactListName=list_name)["Topics"]
+    print(f"\n\nTopics:\n{topics}")
+    topic_answer = input("Topic name, or 'n' for new topic")
+    if topic_answer == "n":
+        topics = utils.add_topic(topics, ses_client)
+
+
+
+
     print_ddb_tables(ddb_client)
     ddb_table = input('DynamoDB Table Name: ')
     ddb_resource = client.get_resource('dynamodb', data["options"])
     table = ddb_resource.Table(ddb_table)
-    ddb_response = table.scan(ProjectionExpression='email, #n, topic',
-                              ExpressionAttributeNames={"#n":"name"})
+    ddb_response = table.scan(ProjectionExpression='email, #fn, #ln, #st',
+                              ExpressionAttributeNames={"#fn":"first",
+                                                        "#ln":"last",
+                                                        "#st":"step"})
     contacts = ddb_response['Items']
     for contact in contacts:
         try:

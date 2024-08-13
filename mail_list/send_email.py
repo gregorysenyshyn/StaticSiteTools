@@ -13,6 +13,9 @@ except ImportError:
     sys.path.append(sys.path[0] + '/..')
     from shared import utils, client
 
+########
+# Topics
+########
 
 def list_topics(ses_client, list_name):
     topics = ses_client.get_contact_list(ContactListName=list_name)["Topics"]
@@ -22,6 +25,10 @@ def list_topics(ses_client, list_name):
         x += 1
     return topics
 
+
+###########
+# Templates
+###########
 
 def list_templates(ses_client, next_token=None):
     if next_token is None:
@@ -39,6 +46,8 @@ def list_templates(ses_client, next_token=None):
             if not next_answer == "n":
                 print("\n")
                 list_templates(ses_client, next_token)
+            else:
+                break
 
 
 def change_templates(ses_client, templates):
@@ -55,7 +64,7 @@ def change_templates(ses_client, templates):
         print("\n1. Add Template to Selection")
         print("\n2. Remove Template from Selection")
         print("\n3. Available Templates")
-        print("\n0. Quit")
+        print("\n0. Back")
         template_answer = input("\nYour Choice? ")
         if template_answer == "1":
             new_template = input("Template name to add? ")
@@ -131,6 +140,9 @@ def delete_templates(ses_client):
     if another == "y":
         delete_templates(ses_client)
 
+###############
+# Email Sending
+###############
 
 def get_contacts(ses_client, list_name, topic, next_token):
     filter_params = { "FilteredStatus": "OPT_IN",
@@ -179,6 +191,9 @@ def send_email(ses_client, list_options, list_name, contacts, template_name, top
 
 
 def send_email_to_topic(ses_client, list_options, list_name, templates, topic):
+    '''
+    Multiple items in templates will equally distribute emails between templates
+    '''
 
     contact_email = list_options["email_address"]
 
@@ -204,6 +219,22 @@ def send_email_to_topic(ses_client, list_options, list_name, templates, topic):
             loop = False
 
 
+def drip_campaign(ses_client, list_options, list_name, templates, topic):
+    '''
+    db field "step" corresponds to templates index (i.e. templates["db_step"])
+    and increments after send
+    '''
+    ddb_client = client.get_client("dynamodb", data["options"])
+    response = ddb_client.list_tables()
+    print("\n\n",response["TableNames"])
+    table_name = input("Which table? ")
+    response = ddb_client.scan(TableName=table_name)
+    for item in response["Items"]:
+        print(item)
+
+
+
+
 def menu(data):
     ses_client = client.get_client('sesv2', data["options"])
     list_options = data["list"]
@@ -224,10 +255,11 @@ def menu(data):
         print("""\n\n### Menu ###
                  \n\n1. Send manual email 
                  \n\n2. Send email to topic
-                 \n\n3. Change Topic
-                 \n\n4. Change Templates
-                 \n\n5. Upload Template
-                 \n\n6. Delete Template
+                 \n\n3. Send drip campaign email
+                 \n\n4. Change Topic
+                 \n\n5. Change Templates
+                 \n\n6. Upload Template
+                 \n\n7. Delete Template
                  \n\n0. Quit\n\n""")
         answer = input("Your choice: ")
         print("\n\n")
@@ -250,14 +282,19 @@ def menu(data):
             else:
                 print("Please set template and topic first!")
         elif answer == "3":
+            if templates and topic:
+                drip_campaign(ses_client, list_options, contact_list_name, templates, topic)
+            else:
+                print("Please set template and topic first!")
+        elif answer == "4":
             topics = list_topics(ses_client, contact_list_name)
             topic = input("Which topic number? ")
             topic = topics[int(topic)]["TopicName"]
-        elif answer == "4":
-            change_templates(ses_client, templates)
         elif answer == "5":
-            create_template(ses_client)
+            change_templates(ses_client, templates)
         elif answer == "6":
+            create_template(ses_client)
+        elif answer == "7":
             delete_templates(ses_client)
 
 

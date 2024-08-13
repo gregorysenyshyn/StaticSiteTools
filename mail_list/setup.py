@@ -17,32 +17,13 @@ def createEmailList(ses_client):
     topics = []
     add_topic_answer = input("Add one or more topics? (y/n): ")
     if add_topic_answer == 'y':
-        topics = add_topic(topics)
+        topics = utils.add_topic(list_name, ses_client)
     response = ses_client.create_contact_list(ContactListName=list_name,
                                               Topics=topics,
                                               Description=list_description)
     print('List Created Successfully!')
 
 
-def add_topic(topics):
-    add_topic = True
-    while add_topic is True:
-        topic_name = input("Topic name: ")
-        topic_display_name = input("Topic Display (public) Name: ")
-        topic_description = input("Topic Description (public): ")
-        opt_in_default = input("Opt into topic by default? (Y/n): ")
-        if opt_in_default == 'y':
-            opt_in_default = 'OPT_IN'
-        else:
-            opt_in_default = 'OPT_OUT'
-        topics.append({'TopicName': topic_name,
-                       'DisplayName': topic_display_name,
-                       'Description': topic_description,
-                       'DefaultSubscriptionStatus': opt_in_default})
-        another_topic = input("Add another topic? (y/N): ")
-        if another_topic != 'y':
-            add_topic = False
-    return topics
 
 
 def make_list_entry(ses_client, list_name, email):
@@ -155,11 +136,7 @@ def menu(data):
                     print(f"{new_email} already on list!")
 
             elif answer == '2':
-                topics = ses_client.get_contact_list(
-                                       ContactListName=list_name)["Topics"]
-                topics = add_topic(topics)
-                ses_client.update_contact_list(ContactListName=list_name,
-                                               Topics=topics)
+                topics = utils.add_topic(list_name, ses_client)
 
             elif answer == '3':
                 add_simulator_emails()
