@@ -136,14 +136,14 @@ def menu(data):
                     print(f"{new_email} already on list!")
 
             elif answer == '2':
-                topics = utils.add_topic(list_name, ses_client)
-
-            elif answer == '3':
                 add_simulator_emails()
 
-            elif answer == '4':
+            elif answer == '3':
                 email = input("email address to check for? ").lower()
                 check_list_entry(ses_client, list_name, email)
+
+            elif answer == '4':
+                topics = utils.add_topic(list_name, ses_client)
 
             elif answer == '5':
                 topics = ses_client.get_contact_list(
@@ -184,10 +184,15 @@ def menu(data):
 
 
             print("""### Menu
-                  \n\nAdd:\n1. New Contact\n2. New Topic\n3. Simulator Emails
-                  \n\nManage:\n4. Contact Info\n5. Topics
-                  \n\nChange:\n6. Topic Opt-In
-                  \n\nDelete:\n7. Topic 
+                  \n\nContacts:
+                  \n1. New
+                  \n2. Add Simulator Emails
+                  \n3. Check Email
+                  \n\nTopics:
+                  \n4. New
+                  \n5. List
+                  \n6. Opt-In/Out
+                  \n7. Delete
                   \n\n0. Quit\n\n""")
             answer = input("Your choice: ")
     else:
