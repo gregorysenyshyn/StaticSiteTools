@@ -1,7 +1,9 @@
 import time
+import json
 import argparse
 
 import boto3
+from botocore.exceptions import ClientError
 
 EMAILS_PER_SECOND = 14
 
@@ -47,7 +49,7 @@ def list_templates(ses_client, next_token=None):
                 print("\n")
                 list_templates(ses_client, next_token)
             else:
-                break
+                return
 
 
 def change_templates(ses_client, templates):
@@ -175,9 +177,10 @@ def check_config_set(ses_client, template_name):
                 SuppressionOptions={'SuppressedReasons': ['BOUNCE', 'COMPLAINT']})
 
 
-def send_email(ses_client, list_options, list_name, contacts, template_name, topic):
+def send_email(ses_client, list_options, list_name, contacts,
+                        template_name, topic, template_data=None):
     content = {"Template": {'TemplateName': template_name,
-                            'TemplateData': '{}'}}
+                            'TemplateData': template_data}}
     check_config_set(ses_client, template_name)
     response = ses_client.send_email(
                         FromEmailAddress=list_options["email_address"],
@@ -230,10 +233,33 @@ def drip_campaign(ses_client, list_options, list_name, templates, topic):
     table_name = input("Which table? ")
     response = ddb_client.scan(TableName=table_name)
     for item in response["Items"]:
-        print(item)
+        template_data = {}
+        try:
+            stage = int(item["stage"]["N"])
+            email = item["email"]["S"]
+            template_data =f'{{ \"first\":\"{item["first"]["S"]}\",  \"last\":\"{item["last"]["S"]}\" }}'
+        except Exception as e:
+            print(e)
+
+        try:
+            response = ses_client.get_contact(ContactListName = list_name, EmailAddress = email)
+            print(response["EmailAddress"])
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NotFoundException':
+                print(f"Creating new SES contact for {email}")
+                ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
+            
+
+        print(f"Sending email to {email}")
+        send_email(ses_client, list_options, list_name, [email], 
+                        templates[stage], topic, json.dumps(template_data))
 
 
-
+        stage += 1
+        query_string = " ".join([f"UPDATE \"{table_name}\"",
+                                f"SET stage={stage}",
+                                f"WHERE email='{email}'"])
+        ddb_client.execute_statement(Statement=query_string)
 
 def menu(data):
     ses_client = client.get_client('sesv2', data["options"])
