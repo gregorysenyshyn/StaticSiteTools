@@ -112,6 +112,28 @@ def sync_with_ses(ddb_client):
                 print(f"Adding contact {contact['email']}")
                 add_ses_contact(contact, list_name, ses_client)
 
+# def quickfix():
+#     ddb_client = client.get_client('dynamodb', data["options"])
+#     table_name = 'leads_meta'
+#     response = ddb_client.scan(TableName=table_name)
+#     csv_data = get_csv_data()
+#     count = 0
+#     count2 = 0
+#     for item in response["Items"]:
+#         email = item["email"]["S"]
+#         if email in csv_data:
+#             query_string = " ".join([f"UPDATE \"{table_name}\"",
+#                                     "SET stage=1",
+#                                     f"WHERE email='{email}'"])
+#         else:
+#             query_string = " ".join([f"UPDATE \"{table_name}\"",
+#                                     "SET stage=0",
+#                                     f"WHERE email='{email}'"])
+#         ddb_client.execute_statement(Statement=query_string)
+
+
+
+
 
 def menu(data):
     ddb_client = client.get_client('dynamodb', data["options"])

@@ -34,10 +34,10 @@ def add_topic(list_name, ses_client):
         topic_display_name = input("Topic Display (public) Name: ")
         topic_description = input("Topic Description (public): ")
         opt_in_default = input("Opt into topic by default? (Y/n): ")
-        if opt_in_default == 'y':
-            opt_in_default = 'OPT_IN'
-        else:
+        if opt_in_default == 'n':
             opt_in_default = 'OPT_OUT'
+        else:
+            opt_in_default = 'OPT_IN'
         topics.append({'TopicName': topic_name,
                        'DisplayName': topic_display_name,
                        'Description': topic_description,

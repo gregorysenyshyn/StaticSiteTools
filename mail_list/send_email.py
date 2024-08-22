@@ -191,6 +191,7 @@ def send_email(ses_client, list_options, list_name, contacts,
                         ConfigurationSetName=template_name,
                         ListManagementOptions={'ContactListName': list_name,
                                                'TopicName': topic})
+    return response
 
 
 def send_email_to_topic(ses_client, list_options, list_name, templates, topic):
@@ -222,7 +223,7 @@ def send_email_to_topic(ses_client, list_options, list_name, templates, topic):
             loop = False
 
 
-def drip_campaign(ses_client, list_options, list_name, templates, topic):
+def drip_campaign(ses_client, list_options, data, list_name, templates, topic):
     '''
     db field "step" corresponds to templates index (i.e. templates["db_step"])
     and increments after send
@@ -232,6 +233,8 @@ def drip_campaign(ses_client, list_options, list_name, templates, topic):
     print("\n\n",response["TableNames"])
     table_name = input("Which table? ")
     response = ddb_client.scan(TableName=table_name)
+
+    render_test_complete = False
     for item in response["Items"]:
         template_data = {}
         try:
@@ -247,19 +250,42 @@ def drip_campaign(ses_client, list_options, list_name, templates, topic):
         except ClientError as e:
             if e.response['Error']['Code'] == 'NotFoundException':
                 print(f"Creating new SES contact for {email}")
-                ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
+                try: 
+                    ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
+                except ClientError as e:
+                    if e.response['Error']['Code'] == 'TooManyRequestsException':
+                        time.sleep(1)
+                        ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
+
+        if not render_test_complete:
+            for template in templates:
+                response = ses_client.test_render_email_template(
+                                TemplateName=template,
+                                TemplateData=template_data
+                            )
+                print(response)
+                continue_answer = input("Continue? (Y/n) ")
+                if continue_answer == "n":
+                    print("Aborting!")
+                    return
+
+            render_test_complete = True
+            print("\n\n######  Test Render Complete!\n\n")
             
-
-        print(f"Sending email to {email}")
-        send_email(ses_client, list_options, list_name, [email], 
+        print(f"Sending email to {email}", end=" ")
+        response = send_email(ses_client, list_options, list_name, [email], 
                         templates[stage], topic, json.dumps(template_data))
-
+        if response["MessageId"]:
+            print(" success")
+        else:
+            print(" ERROR!!!!")
 
         stage += 1
         query_string = " ".join([f"UPDATE \"{table_name}\"",
                                 f"SET stage={stage}",
                                 f"WHERE email='{email}'"])
         ddb_client.execute_statement(Statement=query_string)
+
 
 def menu(data):
     ses_client = client.get_client('sesv2', data["options"])
@@ -309,7 +335,7 @@ def menu(data):
                 print("Please set template and topic first!")
         elif answer == "3":
             if templates and topic:
-                drip_campaign(ses_client, list_options, contact_list_name, templates, topic)
+                drip_campaign(ses_client, list_options, data, contact_list_name, templates, topic)
             else:
                 print("Please set template and topic first!")
         elif answer == "4":
