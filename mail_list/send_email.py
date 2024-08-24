@@ -228,34 +228,32 @@ def drip_campaign(ses_client, list_options, data, list_name, templates, topic):
     db field "step" corresponds to templates index (i.e. templates["db_step"])
     and increments after send
     '''
+    topic_preference = None
+    render_test_complete = False
+    contact_list = ses_client.get_contact_list(ContactListName=list_name)
+
+    for topic_data in contact_list["Topics"]:
+        if topic_data["TopicName"] == topic:
+            topic_preference = topic_data["DefaultSubscriptionStatus"]
+
     ddb_client = client.get_client("dynamodb", data["options"])
     response = ddb_client.list_tables()
     print("\n\n",response["TableNames"])
     table_name = input("Which table? ")
     response = ddb_client.scan(TableName=table_name)
 
-    render_test_complete = False
     for item in response["Items"]:
-        template_data = {}
+        stage = 0
+        email = ""
+        template_data = ""
+
         try:
-            stage = int(item["stage"]["N"])
+            if "stage" in item:
+                stage = int(item["stage"]["N"])
             email = item["email"]["S"]
             template_data =f'{{ \"first\":\"{item["first"]["S"]}\",  \"last\":\"{item["last"]["S"]}\" }}'
         except Exception as e:
             print(e)
-
-        try:
-            response = ses_client.get_contact(ContactListName = list_name, EmailAddress = email)
-            print(response["EmailAddress"])
-        except ClientError as e:
-            if e.response['Error']['Code'] == 'NotFoundException':
-                print(f"Creating new SES contact for {email}")
-                try: 
-                    ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
-                except ClientError as e:
-                    if e.response['Error']['Code'] == 'TooManyRequestsException':
-                        time.sleep(1)
-                        ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
 
         if not render_test_complete:
             for template in templates:
@@ -263,28 +261,53 @@ def drip_campaign(ses_client, list_options, data, list_name, templates, topic):
                                 TemplateName=template,
                                 TemplateData=template_data
                             )
-                print(response)
+                print(response["RenderedTemplate"])
                 continue_answer = input("Continue? (Y/n) ")
                 if continue_answer == "n":
                     print("Aborting!")
                     return
-
             render_test_complete = True
             print("\n\n######  Test Render Complete!\n\n")
-            
-        print(f"Sending email to {email}", end=" ")
-        response = send_email(ses_client, list_options, list_name, [email], 
-                        templates[stage], topic, json.dumps(template_data))
-        if response["MessageId"]:
-            print(" success")
-        else:
-            print(" ERROR!!!!")
 
-        stage += 1
-        query_string = " ".join([f"UPDATE \"{table_name}\"",
-                                f"SET stage={stage}",
-                                f"WHERE email='{email}'"])
-        ddb_client.execute_statement(Statement=query_string)
+        contact = None
+        tries = 0
+        while not contact and tries < 2:
+            try:
+                contact = ses_client.get_contact(ContactListName = list_name, EmailAddress = email)
+                if "TopicPreferences" in contact:
+                    for topic_data in contact["TopicPreferences"]:
+                        if topic_data["TopicName"] == topic:
+                            topic_preference = topic_data["SubscriptionStatus"]
+            except ClientError as e:
+                tries += 1
+                if e.response['Error']['Code'] == 'NotFoundException':
+                    print(f"Creating new SES contact for {email}")
+                    try: 
+                        ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
+                    except ClientError as e:
+                        if e.response['Error']['Code'] == 'TooManyRequestsException':
+                            time.sleep(1)
+                            ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
+
+
+        print(f"{email} - {topic}: {topic_preference}...", end=" ")
+            
+        if topic_preference == "OPT_IN":
+            print("Sending...", end=" ")
+            response = send_email(ses_client, list_options, list_name, [email], 
+                            templates[stage], topic, template_data)
+            if response["MessageId"]:
+                print(" success")
+            else:
+                print(" ERROR!!!!")
+
+            stage += 1
+            query_string = " ".join([f"UPDATE \"{table_name}\"",
+                                    f"SET stage={stage}",
+                                    f"WHERE email='{email}'"])
+            ddb_client.execute_statement(Statement=query_string)
+        else:
+            print("SKIPPING!")
 
 
 def menu(data):
