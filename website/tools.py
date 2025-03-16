@@ -121,9 +121,15 @@ def copy_files(files_to_copy):
             print((f'Copying {os.path.basename(file)} to {dest_path}'
                    '...'),
                   end="")
-            shutil.copyfile(file, os.path.join(dest_path,
-                                               os.path.basename(file)))
-            print(' Done!')
+            if os.path.isfile(file):
+                shutil.copyfile(file, os.path.join(dest_path,
+                                                   os.path.basename(file)))
+                print(' Done!')
+            elif os.path.isdir(file):
+                shutil.copytree(file, os.path.join(dest_path,
+                                                   os.path.basename(file)))
+                print(' Done!')
+
 
 
 def link_static(src, dest):
