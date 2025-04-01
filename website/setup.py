@@ -379,10 +379,10 @@ def get_acm_certificate(options):
         for item in cert_list['CertificateSummaryList']:
             if str(item['DomainName']).endswith(options['s3_bucket']):
                 cert_arn = item['CertificateArn']
-    else:
-        ans = input('No SSL certificate found! Create one? (y/n) ')
-        if ans == 'y':
-            cert_arn = request_acm_certificate(options)
+                return cert_arn
+    ans = input('No SSL certificate found! Create one? (y/n) ')
+    if ans == 'y':
+        cert_arn = request_acm_certificate(options)
 
     return cert_arn
 

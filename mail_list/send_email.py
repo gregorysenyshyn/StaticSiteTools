@@ -223,14 +223,16 @@ def send_email_to_topic(ses_client, list_options, list_name, templates, topic):
             loop = False
 
 
-def drip_campaign(ses_client, list_options, data, list_name, templates, topic):
+def drip_campaign(ses_client, list_options, data, list_name, topic):
     '''
     db field "step" corresponds to templates index (i.e. templates["db_step"])
     and increments after send
     '''
+    contact_list = ses_client.get_contact_list(ContactListName=list_name)
+    campaign_name = input("Campaign name? ")
+
     topic_preference = None
     render_test_complete = False
-    contact_list = ses_client.get_contact_list(ContactListName=list_name)
 
     for topic_data in contact_list["Topics"]:
         if topic_data["TopicName"] == topic:
@@ -243,29 +245,32 @@ def drip_campaign(ses_client, list_options, data, list_name, templates, topic):
     response = ddb_client.scan(TableName=table_name)
 
     for item in response["Items"]:
-        stage = 0
         email = ""
         template_data = ""
+        full_name = item["name"]["S"]
+        first_name = full_name.split()[0]
 
+        stage = 0
         try:
-            if "stage" in item:
-                stage = int(item["stage"]["N"])
+            if campaign_name in item:
+                stage = int(item[campaign_name]["N"])
             email = item["email"]["S"]
-            template_data =f'{{ \"first\":\"{item["first"]["S"]}\",  \"last\":\"{item["last"]["S"]}\" }}'
+            template_data =f'{{ \"first_name\":\"{first_name}\" }}'
         except Exception as e:
             print(e)
 
+        template = f"{campaign_name}-{stage}"
+
         if not render_test_complete:
-            for template in templates:
-                response = ses_client.test_render_email_template(
-                                TemplateName=template,
-                                TemplateData=template_data
-                            )
-                print(response["RenderedTemplate"])
-                continue_answer = input("Continue? (Y/n) ")
-                if continue_answer == "n":
-                    print("Aborting!")
-                    return
+            response = ses_client.test_render_email_template(
+                            TemplateName=template,
+                            TemplateData=template_data
+                        )
+            print(response["RenderedTemplate"])
+            continue_answer = input("Continue? (Y/n) ")
+            if continue_answer == "n":
+                print("Aborting!")
+                return
             render_test_complete = True
             print("\n\n######  Test Render Complete!\n\n")
 
@@ -274,10 +279,11 @@ def drip_campaign(ses_client, list_options, data, list_name, templates, topic):
         while not contact and tries < 2:
             try:
                 contact = ses_client.get_contact(ContactListName = list_name, EmailAddress = email)
+                personal_topic_preference = topic_preference
                 if "TopicPreferences" in contact:
                     for topic_data in contact["TopicPreferences"]:
                         if topic_data["TopicName"] == topic:
-                            topic_preference = topic_data["SubscriptionStatus"]
+                            personal_topic_preference = topic_data["SubscriptionStatus"]
             except ClientError as e:
                 tries += 1
                 if e.response['Error']['Code'] == 'NotFoundException':
@@ -290,12 +296,12 @@ def drip_campaign(ses_client, list_options, data, list_name, templates, topic):
                             ses_client.create_contact(ContactListName = list_name, EmailAddress = email)
 
 
-        print(f"{email} - {topic}: {topic_preference}...", end=" ")
+        print(f"{email} - {topic}: {personal_topic_preference}...", end=" ")
             
-        if topic_preference == "OPT_IN":
+        if personal_topic_preference == "OPT_IN":
             print("Sending...", end=" ")
             response = send_email(ses_client, list_options, list_name, [email], 
-                            templates[stage], topic, template_data)
+                            template, topic, template_data)
             if response["MessageId"]:
                 print(" success")
             else:
@@ -303,7 +309,7 @@ def drip_campaign(ses_client, list_options, data, list_name, templates, topic):
 
             stage += 1
             query_string = " ".join([f"UPDATE \"{table_name}\"",
-                                    f"SET stage={stage}",
+                                    f"SET {campaign_name}={stage}",
                                     f"WHERE email='{email}'"])
             ddb_client.execute_statement(Statement=query_string)
         else:
@@ -357,10 +363,10 @@ def menu(data):
             else:
                 print("Please set template and topic first!")
         elif answer == "3":
-            if templates and topic:
-                drip_campaign(ses_client, list_options, data, contact_list_name, templates, topic)
+            if topic:
+                drip_campaign(ses_client, list_options, data, contact_list_name, topic)
             else:
-                print("Please set template and topic first!")
+                print("Please set topic first!")
         elif answer == "4":
             topics = list_topics(ses_client, contact_list_name)
             topic = input("Which topic number? ")

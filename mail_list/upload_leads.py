@@ -21,7 +21,7 @@ def get_csv_data():
     csv_path = input('CSV file path: ')
     try:
         with open(csv_path, "r") as f:
-            reader = csv.reader(f, quoting=csv.QUOTE_NONNUMERIC)
+            reader = csv.reader(f)
             all_rows = list(reader)
             header = all_rows[0]
             rows = all_rows[1:]
@@ -44,15 +44,13 @@ def upload_to_ddb(ddb_client, field_names, csv_data):
     ddb_table = input('DynamoDB Table Name: ')
     for lead_data in csv_data:
         print(lead_data)
-        query_string = f"INSERT INTO \"{ddb_table}\" value {{"
+
+        query_string = f"INSERT INTO {ddb_table} value {{"
         for i in range(0, len(field_names)):
-            if isinstance(lead_data[i], str):
-                query_string = (query_string + 
-                                f" '{field_names[i]}' : '{lead_data[i]}',")
-            elif isinstance(lead_data[i], (int, float, complex)):
-                query_string = (query_string + 
-                                f" '{field_names[i]}' : {lead_data[i]},")
+            query_string = (query_string + 
+                            f" '{field_names[i]}' : '{lead_data[i]}',")
         query_string = query_string[:-1] + "}"
+
         try:
             print(query_string)
             ddb_client.execute_statement(Statement=query_string)
@@ -60,7 +58,11 @@ def upload_to_ddb(ddb_client, field_names, csv_data):
             if e.response['Error']['Code'] == "DuplicateItemException":
                 print(f"ERROR! Item {lead_data} already exists!")
             elif e.response['Error']['Code'] == "ValidationException":
-                print(f"VALIDATION ERROR! Item {lead_data} already exists!")
+                print(f"VALIDATION ERROR! {lead_data}")
+                print(e)
+            continue_answer = input("Continue? (y/N) ")
+            if not continue_answer == "y":
+                return
 
 
 def add_ses_contact(contact, list_name, ses_client, contact_attributes=None):
