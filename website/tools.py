@@ -245,13 +245,13 @@ def get_nav_pages(files, options):
             page = {'src': page_name,
                     'dest': get_destination(page_name, fileset['dest'], False)}
             set_page_metadata(page)
-            if 'order' in page['data']:
+            if page['data'].get('nav_item'):
                 nav_data = {}
-                nav_data['title'] = page['data']['title']
-                nav_data['dest'] = page['dest']
-                nav_data['order'] = page['data']['order']
-                if 'subtitle' in page['data']:
-                    nav_data['subtitle'] = page['data']['subtitle']
+                nav_data['title'] = page['data'].get('title')
+                nav_data['dest'] = page.get('dest')
+                nav_data['order'] = page['data'].get('order')
+                nav_data['subtitle'] = page['data'].get('subtitle')
+                nav_data['nav_category'] = page['data'].get('nav_category')
                 nav_pages.append(nav_data)
 
     nav_pages = sorted(nav_pages, key=lambda x: x['order'])
