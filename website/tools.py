@@ -252,6 +252,7 @@ def get_nav_pages(files, options):
                     'dest': get_destination(page_name, fileset['dest'], False)}
             set_page_metadata(page)
             if page['data'].get('nav_item'):
+                (print("yes nav: ", page['src']))
                 nav_data = {}
                 nav_data['title'] = page['data'].get('title')
                 nav_data['dest'] = page.get('dest')
@@ -333,7 +334,7 @@ def build_page(page, j2_env, options):
 def build_pageset(pageset, options):
     '''Logic for building pages.'''
 
-    if 'nav' in pageset['options']:
+    if pageset['options'].get('nav'):
         nav_pages = get_nav_pages(pageset['files'], options)
 
     pages = get_pages(pageset['files'], options)
