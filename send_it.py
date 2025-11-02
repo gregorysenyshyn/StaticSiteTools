@@ -12,6 +12,7 @@ from shared import utils
 from shared.client import get_client
 from website.utils import get_distribution_id
 from website.test_api import test_api_endpoints
+from website.deploy_lambda import package_lambda, deploy_lambda
 
 
 def handle_page(filename, destname, options, client):
@@ -143,6 +144,16 @@ def run_api_tests(data):
         else:
             print("No API endpoints found in the data file.")
 
+def deploy_lambda_functions(data):
+    """Deploys the Lambda functions."""
+    if prompt_user('\nDeploy Lambda functions?'):
+        if 'lambda_functions' in data:
+            for function in data['lambda_functions']:
+                zip_path = package_lambda(function['path'], function['name'])
+                deploy_lambda(zip_path, function, data['options'])
+        else:
+            print("No Lambda functions found in the data file.")
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -154,4 +165,5 @@ if __name__ == '__main__':
     upload_to_s3(data)
     invalidate_cdn(data)
     run_api_tests(data)
+    deploy_lambda_functions(data)
     check_website_settings(data)
