@@ -2,7 +2,7 @@
 
 import os
 import time
-import argparse
+import click
 import subprocess
 
 from website import tools
@@ -57,25 +57,25 @@ def build(data):
           f'{round(float(time.time() - t0), 4)} seconds ===')
 
 
-if __name__ == '__main__':
-
+@click.command()
+@click.option('--data', help='YAML data file')
+@click.option('--production', is_flag=True, help='Include analytics, etc.')
+def main(data, production):
+    """This script builds the website."""
     try:
-        from shared import utils, client
-
+        from shared import utils
     except ImportError:
         import sys
         sys.path.append(sys.path[0] + '/..')
-        from shared import utils, client
+        from shared import utils
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data', help='YAML data file')
-    parser.add_argument('--production',
-                        action='store_true',
-                        help='Include analytics, etc.')
-    args = parser.parse_args()
-    data = utils.load_yaml(args.data)
-    if args.production:
+    data = utils.load_yaml(data)
+    if production:
         data['options']['production'] = True
     else:
         data['options']['production'] = False
     build(data)
+
+
+if __name__ == '__main__':
+    main()

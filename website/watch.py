@@ -2,7 +2,7 @@
 
 import os
 import time
-import argparse
+import click
 from glob import glob
 
 import tools
@@ -106,10 +106,12 @@ def watch(data):
     observer.join()
 
 
+@click.command()
+@click.option('--data', help='YAML data file')
+def main(data):
+    """This script watches for changes in the source files and rebuilds them."""
+    watch(data)
+
+
 if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data', help='YAML data file')
-    args = parser.parse_args()
-
-    watch(args.data)
+    main()
