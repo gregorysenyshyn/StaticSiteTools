@@ -1,0 +1,8 @@
+click
+boto3
+PyYAML
+jinja2
+libsass
+mistune
+python-frontmatter
+watchdog

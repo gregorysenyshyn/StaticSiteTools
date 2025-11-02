@@ -5,7 +5,7 @@ import os
 import glob
 import json
 import time
-import argparse
+import click
 
 
 from shared import utils
@@ -82,29 +82,25 @@ def send_it(options, client):
         else:
             print(f'ERROR - Not uploading hidden file {filename}')
 
-if __name__ == '__main__':
+@click.command()
+@click.option('--data', help='YAML data file')
+def main(data):
+    """This script deploys the website to S3 and CloudFront."""
+    data = utils.load_yaml(data)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data', help='YAML data file')
-    args = parser.parse_args()
-    data = utils.load_yaml(args.data)
-
-    check = input('Create new production build? (Y/n) ')
-    if not check == 'n':
+    if click.confirm('Create new production build?', default=True):
         data['options']['production'] = True
         import build
         build.build(data)
 
-    answer = input('Ready to send? (Y/n) ')
-    if not answer == 'n':
+    if click.confirm('Ready to send?', default=True):
         print((f'#####\nUploading {data["options"]["dist"]}'),
               (f'to {data["options"]["s3_bucket"]}...'))
         s3_client = get_client('s3', data['options'])
         send_it(data['options'], s3_client)
         print('Done!\n')
 
-    answer = input("\nCreate CDN invalidation? (Y/n)")
-    if not answer == 'n':
+    if click.confirm('Create CDN invalidation?', default=True):
         cf_client = get_client("cloudfront", data['options'])
         distribution_id = None
         print("\nGetting distribution ID...")
@@ -129,9 +125,10 @@ if __name__ == '__main__':
                     Id=response['Invalidation']['Id'])
         print("Done!")
 
-
-    answer = input('\nCheck website settings? (Y/n) ')
-    if not answer == 'n':
+    if click.confirm('Check website settings?', default=True):
         from website.setup import check
         check(data['options'])
 
+
+if __name__ == '__main__':
+    main()
