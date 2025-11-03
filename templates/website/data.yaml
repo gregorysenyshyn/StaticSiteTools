@@ -52,3 +52,10 @@ html:
     layouts:
       - src/layouts/layout.html
     options: {}
+
+lambda_functions:
+  - name: hello-world
+    path: lambda/hello-world
+    role: arn:aws:iam::123456789012:role/lambda-role
+    runtime: python3.9
+    handler: app.lambda_handler

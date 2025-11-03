@@ -1,6 +1,6 @@
 import os 
 import json
-import click
+import argparse
 import datetime
 
 import sys
@@ -20,7 +20,8 @@ def check_buckets(bucket_name, s3_client):
     bucket_names = [bucket_name, f"www.{bucket_name}"]
     for bucket_name in bucket_names:
         if bucket_name not in bucket_list:
-            if click.confirm(f"No bucket named {bucket_name} exists! Create it?", default=True):
+            ans = input(f"No bucket named {bucket_name} exists! Create it? (y/n) ")
+            if ans == 'y':
                 s3_client.create_bucket(Bucket=bucket_name)
         check_bucket_policy(bucket_name, s3_client)
 
@@ -35,11 +36,13 @@ def check_bucket_policy(bucket_name, s3_client):
             print(f'{bucket_name} is NOT public')
             response = s3_client.get_bucket_policy(Bucket=bucket_name)
             print(f'Policy:\n{response["Policy"]}')
-            if click.confirm('Reset bucket policy?', default=True):
+            new_policy = input('Reset bucket policy? (Y/n) ')
+            if not new_policy == 'n':
                 reset_bucket_policy(bucket_name, s3_client)
     except ClientError as e:
         print(e)
-        if click.confirm('Reset bucket policy?', default=True):
+        new_policy = input('Reset bucket policy? (Y/n) ')
+        if not new_policy == 'n':
             reset_bucket_policy(bucket_name, s3_client)
 
 
@@ -77,9 +80,16 @@ def confirm_website_settings(options, s3_client):
         response = s3_client.get_bucket_website(Bucket=bucket)
         check_index_and_error_pages(response, options)
     except ClientError:
-        if click.confirm(f'\nERROR: no website config for {bucket}\nSet up website?', default=True):
-            index_name = click.prompt('Index page name?', default='index')
-            error_name = click.prompt('Error page name?', default='error')
+        print(f'\nERROR: no website config for {bucket}\nSet up website? (Y/n) ',
+                end='')
+        answer = input()
+        if not answer == 'n':
+            index_name = input('Index page name? (index): ')
+            if index_name == '':
+                index_name = 'index'
+            error_name = input('Error page name? (error): ')
+            if error_name == '':
+                error_name = 'error'
             set_up_website(options, s3_client,
                            index_name=index_name, error_name=error_name)
     bucket = f'www.{options["s3_bucket"]}'
@@ -89,7 +99,10 @@ def confirm_website_settings(options, s3_client):
               f'{response["RedirectAllRequestsTo"]["HostName"]} over',
               f'{response["RedirectAllRequestsTo"]["Protocol"]}')
     except:
-        if click.confirm(f'\nERROR: no website config for {bucket}\nSet up redirect?', default=True):
+        print(f'\nERROR: no website config for {bucket}\nSet up redirect? (Y/n) ',
+              end='')
+        answer = input()
+        if not answer == 'n':
             print('\nSetting up website redirect... ')
             s3_client.put_bucket_website(
                 Bucket=bucket,
@@ -230,7 +243,8 @@ def check_cdn_distribution(options):
     distribution_arn = ''
     response = cf_client.list_distributions()
     if response['DistributionList']['Quantity'] == 0:
-        if click.confirm('No distributions found! Create one?', default=True):
+        create = input('No distributions found! Create one? (Y/n) ')
+        if not create == 'n':
             distribution_arn = create_cdn_distribution(options)
         else:
             raise SystemExit('No distributions!')
@@ -247,7 +261,9 @@ def check_cdn_distribution(options):
         if aliases:
             print(f'CDN distribution exists for {aliases}')
         else:
-            if click.confirm(f"No distributions found for {options['s3_bucket']}! Create one?", default=True):
+            create = input(f"No distributions found for {options['s3_bucket']}! "
+                           'Create one? (Y/n) ')
+            if not create == 'n':
                 distribution_arn = create_cdn_distribution(options)
             else:
                 raise SystemExit('No distributions!')
@@ -340,7 +356,8 @@ def get_oai(cf_client, options):
                 else:
                     oai = create_oai(cf_client, options)
         else:
-            if click.confirm('No OAI found. Create one?', default=True):
+            oai_answer = input('No OAI found.  Create one? (Y/n) ')
+            if not oai_answer == 'n':
                 oai = create_oai(cf_client, options)
             else:
                 raise SystemExit('No Origin Access Identities!'
@@ -363,7 +380,8 @@ def get_acm_certificate(options):
             if str(item['DomainName']).endswith(options['s3_bucket']):
                 cert_arn = item['CertificateArn']
                 return cert_arn
-    if click.confirm('No SSL certificate found! Create one?', default=True):
+    ans = input('No SSL certificate found! Create one? (y/n) ')
+    if ans == 'y':
         cert_arn = request_acm_certificate(options)
 
     return cert_arn
@@ -391,9 +409,10 @@ def check_certificate_records(cert_arn, options):
                   RecordName=validation['ResourceRecord']['Name'],
                    RecordType='CNAME')
         if len(record['RecordData']) < 1:
-            if click.confirm(('No CNAME Validation Record Found for'
+            record_q = input(('No CNAME Validation Record Found for'
                                 f' {validation["ResourceRecord"]["Name"]}.'
-                                '  Create one?'), default=True):
+                                '  Create one (y/n)? '))
+            if record_q == 'y':
                 create_cname_record(options, validation, zone)
             else:
                 raise SystemExit('DNS-Validated Certificate'
@@ -429,7 +448,8 @@ def check_dns(cdn_arn, options):
         print(f'{options["s3_bucket"]} in A records')
     else:
         print(f'{options["s3_bucket"]} NOT in A records')
-        if click.confirm('Create record now?', default=True):
+        response = input('Create record now? (Y/n): ')
+        if not response == 'n':
             print('\nCreating A record')
             cf_client = get_client('cloudfront', options)
             distribution = cf_client.get_distribution(
@@ -443,7 +463,8 @@ def check_dns(cdn_arn, options):
         print(f'www.{options["s3_bucket"]} in A records')
     else:
         print(f'www.{options["s3_bucket"]} NOT in A records')
-        if click.confirm('Create record now?', default=True):
+        response = input('Create record now? (Y/n): ')
+        if not response == 'n':
             client = get_client('s3', options)
             region = client.get_bucket_location(
                          Bucket=f'www.{options["s3_bucket"]}'
@@ -475,13 +496,10 @@ def check(options):
     print('\nCheck Complete!\n')
 
 
-@click.command()
-@click.option('--data', help='YAML data file', required=True)
-def main(data):
-    """This script checks the website settings."""
-    options = utils.load_yaml(data)['options']
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data', help='YAML data file', required=True)
+    args = parser.parse_args()
+    options = utils.load_yaml(args.data)['options']
     check(options)
 
-
-if __name__ == '__main__':
-    main()

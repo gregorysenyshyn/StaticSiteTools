@@ -1,4 +1,5 @@
-import click
+import argparse
+
 import yaml
 
 try:
@@ -29,30 +30,29 @@ def add_topic(list_name, ses_client):
                            ContactListName=list_name)["Topics"]
     add_topic = True
     while add_topic is True:
-        topic_name = click.prompt("Topic name")
-        topic_display_name = click.prompt("Topic Display (public) Name")
-        topic_description = click.prompt("Topic Description (public)")
-        if click.confirm("Opt into topic by default?", default=True):
-            opt_in_default = 'OPT_IN'
-        else:
+        topic_name = input("Topic name: ")
+        topic_display_name = input("Topic Display (public) Name: ")
+        topic_description = input("Topic Description (public): ")
+        opt_in_default = input("Opt into topic by default? (Y/n): ")
+        if opt_in_default == 'n':
             opt_in_default = 'OPT_OUT'
+        else:
+            opt_in_default = 'OPT_IN'
         topics.append({'TopicName': topic_name,
                        'DisplayName': topic_display_name,
                        'Description': topic_description,
                        'DefaultSubscriptionStatus': opt_in_default})
-        if not click.confirm("Add another topic?", default=False):
+        another_topic = input("Add another topic? (y/N): ")
+        if another_topic != 'y':
             add_topic = False
     ses_client.update_contact_list(ContactListName=list_name,
                                    Topics=topics)
 
 
-@click.command()
-@click.option('--data', help='YAML data file', required=True)
-def main(data):
-    """This script contains utility functions for the other scripts."""
-    data = load_yaml(data)
-    options = data['options']
-
-
 if __name__ == '__main__':
-    main()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data', help='YAML data file', required=True)
+    args = parser.parse_args()
+    data = load_yaml(args.data)
+    options = data['options']
