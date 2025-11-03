@@ -52,3 +52,22 @@ html:
     layouts:
       - src/layouts/layout.html
     options: {}
+
+api_endpoints:
+  - https://api.example.com/health
+  - https://api.example.com/users
+  - https://api.example.com/products
+
+lambda_functions:
+  - path: contact_form
+    name: contact_form_lambda
+    role: arn:aws:iam::123456789012:role/lambda_basic_execution
+    runtime: python3.9
+    handler: contact.lambda_handler
+    deploy: true
+  - path: another_lambda
+    name: another_lambda
+    role: arn:aws:iam::123456789012:role/lambda_basic_execution
+    runtime: python3.9
+    handler: another.lambda_handler
+    deploy: false
