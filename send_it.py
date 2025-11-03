@@ -149,8 +149,9 @@ def deploy_lambda_functions(data):
     if prompt_user('\nDeploy Lambda functions?'):
         if 'lambda_functions' in data:
             for function in data['lambda_functions']:
-                zip_path = package_lambda(function['path'], function['name'])
-                deploy_lambda(zip_path, function, data['options'])
+                if function.get('deploy', True):
+                    zip_path = package_lambda(function['path'], function['name'])
+                    deploy_lambda(zip_path, function, data['options'])
         else:
             print("No Lambda functions found in the data file.")
 

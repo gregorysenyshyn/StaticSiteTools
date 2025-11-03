@@ -62,7 +62,8 @@ if __name__ == '__main__':
 
     if 'lambda_functions' in data:
         for function in data['lambda_functions']:
-            zip_path = package_lambda(function['path'], function['name'])
-            deploy_lambda(zip_path, function, data['options'], args.dry_run)
+            if function.get('deploy', True):
+                zip_path = package_lambda(function['path'], function['name'])
+                deploy_lambda(zip_path, function, data['options'], args.dry_run)
     else:
         print("No Lambda functions found in the data file.")
