@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Serverless application for website lambdas
+
+Parameters:
+  VerifiedEmail:
+    Type: String
+    Description: Email address verified in SES
+    Default: ""
+  EmailArn:
+    Type: String
+    Description: ARN of the verified email
+    Default: ""
+  GoogleRecaptchaKey:
+    Type: String
+    Description: Google Recaptcha Site Key
+    Default: ""
+  GoogleApiKey:
+    Type: String
+    Description: Google API Key
+    Default: ""
+  LambdaExecutionRole:
+    Type: String
+    Description: IAM Role ARN for the Lambda function
+
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+  WebsiteApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+  ContactFormFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: contact_form/
+      Handler: contact.lambda_handler
+      Runtime: python3.9
+      Role: !Ref LambdaExecutionRole
+      Environment:
+        Variables:
+          VERIFIED_EMAIL: !Ref VerifiedEmail
+          EMAIL_ARN: !Ref EmailArn
+          GOOGLE_RECAPTCHA_KEY: !Ref GoogleRecaptchaKey
+          GOOGLE_API_KEY: !Ref GoogleApiKey
+      Events:
+        ContactApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /contact
+            Method: post
+
+Outputs:
+  WebsiteApiUrl:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${WebsiteApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
