@@ -6,3 +6,4 @@ libsass
 mistune
 python-frontmatter
 watchdog
+requests
