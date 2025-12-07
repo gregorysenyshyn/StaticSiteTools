@@ -6,13 +6,14 @@ import glob
 import json
 import time
 import click
+import subprocess
+import argparse
 
 
 from shared import utils
 from shared.client import get_client
 from website.utils import get_distribution_id
 from website.test_api import test_api_endpoints
-from website.deploy_lambda import package_lambda, deploy_lambda
 
 
 def handle_page(filename, destname, options, client):
@@ -192,16 +193,43 @@ def run_api_tests(data):
         else:
             print("No API endpoints found in the data file.")
 
-def deploy_lambda_functions(data):
-    """Deploys the Lambda functions."""
-    if prompt_user('\nDeploy Lambda functions?'):
+def deploy_infrastructure(data):
+    """Deploys the infrastructure using SAM."""
+    if prompt_user('\nDeploy Infrastructure (SAM)?'):
+        print("Building SAM application...")
+        subprocess.check_call(['sam', 'build'])
+
+        print("Deploying SAM application...")
+        # Construct parameter overrides
+        verified_email = data.get('list', {}).get('email_address', '')
+        email_arn = data.get('list', {}).get('email_arn', '')
+        recaptcha_key = data.get('options', {}).get('recaptcha_sitekey', '')
+        google_api_key = data.get('options', {}).get('google_api_key', '')
+
+        # Find the role for contact_form_lambda
+        role_arn = ""
         if 'lambda_functions' in data:
-            for function in data['lambda_functions']:
-                if function.get('deploy', True):
-                    zip_path = package_lambda(function['path'], function['name'])
-                    deploy_lambda(zip_path, function, data['options'])
-        else:
-            print("No Lambda functions found in the data file.")
+            for func in data['lambda_functions']:
+                if func.get('name') == 'contact_form_lambda':
+                    role_arn = func.get('role', '')
+                    break
+
+        # Construct command list for subprocess
+        # Pass each override as a separate argument to --parameter-overrides
+        # subprocess handles spaces in arguments automatically, so manual quoting is not needed/harmful
+        cmd = ['sam', 'deploy', '--parameter-overrides']
+
+        overrides_list = [
+            f"VerifiedEmail={verified_email}",
+            f"EmailArn={email_arn}",
+            f"GoogleRecaptchaKey={recaptcha_key}",
+            f"GoogleApiKey={google_api_key}",
+            f"LambdaExecutionRole={role_arn}"
+        ]
+
+        cmd.extend(overrides_list)
+
+        subprocess.check_call(cmd)
 
 if __name__ == '__main__':
 
@@ -214,5 +242,5 @@ if __name__ == '__main__':
     upload_to_s3(data)
     invalidate_cdn(data)
     run_api_tests(data)
-    deploy_lambda_functions(data)
+    deploy_infrastructure(data)
     check_website_settings(data)
