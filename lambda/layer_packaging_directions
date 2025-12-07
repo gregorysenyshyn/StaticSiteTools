@@ -1,8 +1,0 @@
-mkdir my-lambda-layer && cd my-lambda-layer  
-mkdir -p aws-layer/python/lib/python3.11/site-packages  
-vim requirements.txt
-(put your dependencies here, like: requests)
-pip3.11 install -r requirements.txt --target aws-layer/python/lib/python3.11/site-packages
-cd aws-layer
-zip -r9 lambda-layer.zip .
-
