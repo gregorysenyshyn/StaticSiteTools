@@ -4,6 +4,7 @@ import json
 import argparse
 
 import boto3
+from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
 
 try:
@@ -65,54 +66,107 @@ def upload_to_ddb(ddb_client, field_names, csv_data):
                 return
 
 
-def add_ses_contact(contact, list_name, ses_client, contact_attributes=None):
-    try: 
-        response = ses_client.create_contact(
-                                ContactListName=list_name,
-                                EmailAddress=contact["email"],
-                                TopicPreferences=[
-                                    {'TopicName': contact["topic"],
-                                    'SubscriptionStatus': 'OPT_IN'}]
-                                )
+def add_ses_contact(contact, list_name, ses_client, topic_name=None, contact_attributes=None):
+    topic = topic_name if topic_name else contact.get("topic")
+    topic_preferences = []
+    if topic:
+        topic_preferences = [{'TopicName': topic, 'SubscriptionStatus': 'OPT_IN'}]
+
+    try:
+        ses_client.create_contact(
+            ContactListName=list_name,
+            EmailAddress=contact["email"],
+            TopicPreferences=topic_preferences
+        )
+        print(f"Added contact {contact['email']} to topic '{topic}'")
     except ClientError as e:
-        if e.response['Error']['Code'] == "BadRequestException":
-            print(f"Topic {contact['topic']} not found.  Creating new topic.")
-            utils.add_topic(topics)
-            add_ses_contact(contact, list_name, ses_client)
+        print(f"Error adding contact {contact['email']}: {e}")
 
 
 def sync_with_ses(ddb_client):
-    # TODO Add topic selection and refine ddb scan query
     ses_client = client.get_client('sesv2', data["options"])
     list_name = utils.get_list_name(ses_client)
-    topics = ses_client.get_contact_list(
-                           ContactListName=list_name)["Topics"]
-    print(f"\n\nTopics:\n{topics}")
-    topic_answer = input("Topic name, or 'n' for new topic")
-    if topic_answer == "n":
-        topics = utils.add_topic(topics, ses_client)
 
+    selected_topic_name = None
+    while not selected_topic_name:
+        contact_list = ses_client.get_contact_list(ContactListName=list_name)
+        topics = contact_list.get("Topics", [])
+        print(f"\nAvailable Topics for list '{list_name}':")
+        for i, t in enumerate(topics):
+            print(f"{i + 1}. {t['TopicName']} (Display: {t.get('DisplayName', 'N/A')})")
 
+        choice = input("\nSelect topic number, or 'n' to create a new topic: ")
 
+        if choice.lower() == 'n':
+            utils.add_topic(list_name, ses_client)
+            continue
+
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(topics):
+                selected_topic_name = topics[idx]['TopicName']
+            else:
+                print("Invalid number. Please try again.")
+        except ValueError:
+            print("Invalid input. Please enter a number or 'n'.")
+
+    print(f"Selected Topic: {selected_topic_name}")
 
     print_ddb_tables(ddb_client)
     ddb_table = input('DynamoDB Table Name: ')
     ddb_resource = client.get_resource('dynamodb', data["options"])
     table = ddb_resource.Table(ddb_table)
-    ddb_response = table.scan(ProjectionExpression='email, #fn, #ln, #st',
-                              ExpressionAttributeNames={"#fn":"first",
-                                                        "#ln":"last",
-                                                        "#st":"step"})
-    contacts = ddb_response['Items']
-    for contact in contacts:
-        try:
-            response = ses_client.get_contact(
-                                      ContactListName = list_name,
-                                      EmailAddress = contact['email'])
-        except ClientError as e:
-            if e.response['Error']['Code'] == "NotFoundException":
-                print(f"Adding contact {contact['email']}")
-                add_ses_contact(contact, list_name, ses_client)
+
+    scan_kwargs = {
+        'ProjectionExpression': 'email, #fn, #ln, #st',
+        'ExpressionAttributeNames': {"#fn": "first", "#ln": "last", "#st": "step"}
+    }
+
+    print("\nDo you want to filter the scan? (e.g., only process items where step=1)")
+    filter_attr = input("Enter attribute name to filter by (or press Enter to scan all): ").strip()
+    if filter_attr:
+        filter_value = input(f"Enter value for '{filter_attr}': ").strip()
+        if filter_value.isdigit():
+            if input(f"Treat '{filter_value}' as a number? (y/N) ").lower() == 'y':
+                filter_value = int(filter_value)
+
+        scan_kwargs['FilterExpression'] = Attr(filter_attr).eq(filter_value)
+        print(f"Filtering scan: {filter_attr} == {filter_value}")
+
+    print("Starting DynamoDB scan...")
+    done = False
+    start_key = None
+    total_scanned = 0
+
+    while not done:
+        if start_key:
+            scan_kwargs['ExclusiveStartKey'] = start_key
+
+        response = table.scan(**scan_kwargs)
+        start_key = response.get('LastEvaluatedKey', None)
+        done = start_key is None
+
+        items = response.get('Items', [])
+        total_scanned += len(items)
+        print(f"Scanned page, processing {len(items)} items...")
+
+        for contact in items:
+            email = contact.get('email')
+            if not email:
+                continue
+
+            try:
+                ses_client.get_contact(
+                    ContactListName=list_name,
+                    EmailAddress=email
+                )
+            except ClientError as e:
+                if e.response['Error']['Code'] == "NotFoundException":
+                    add_ses_contact(contact, list_name, ses_client, topic_name=selected_topic_name)
+                else:
+                    print(f"Error checking contact {email}: {e}")
+
+    print(f"\nSync complete. Total items processed: {total_scanned}")
 
 # def quickfix():
 #     ddb_client = client.get_client('dynamodb', data["options"])
