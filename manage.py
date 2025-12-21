@@ -23,9 +23,10 @@ def load_config(config_file):
         sys.exit(1)
     return utils.load_yaml(config_file)
 
-def get_stack_outputs(stack_name, region):
+def get_stack_outputs(stack_name, region, options):
     """Retrieves outputs from a CloudFormation stack."""
-    client = boto3.client('cloudformation', region_name=region)
+    # Use get_client to ensure we use the correct profile if specified
+    client = get_client('cloudformation', options)
     try:
         response = client.describe_stacks(StackName=stack_name)
     except client.exceptions.ClientError as e:
@@ -178,7 +179,7 @@ def invalidate_cloudfront(data, distribution_id):
 
 # --- Core Deployment Logic Helpers ---
 
-def perform_sam_deploy(env, stack_name):
+def perform_sam_deploy(env, stack_name, options):
     """Executes SAM build and deploy."""
     click.echo(f"Building SAM application for {env}...")
     try:
@@ -196,6 +197,10 @@ def perform_sam_deploy(env, stack_name):
         '--capabilities', 'CAPABILITY_IAM'
     ]
 
+    # Add profile if specified in config
+    if 'aws_profile_name' in options:
+        deploy_cmd.extend(['--profile', options['aws_profile_name']])
+
     try:
         subprocess.check_call(deploy_cmd)
     except subprocess.CalledProcessError:
@@ -208,7 +213,8 @@ def perform_site_deploy(env, config_file, stack_name):
     region = data['options'].get('aws_region_name', 'us-east-1')
 
     click.echo("Retrieving Stack Outputs...")
-    outputs = get_stack_outputs(stack_name, region)
+    # Pass options so get_client uses the correct profile
+    outputs = get_stack_outputs(stack_name, region, data['options'])
 
     bucket_name = outputs.get('WebsiteBucketName')
     api_url = outputs.get('ApiUrl')
@@ -278,12 +284,13 @@ def deploy_infra(env):
     """Deploys ONLY the SAM infrastructure."""
     config_file, stack_name = get_env_details(env)
 
-    # Check config existence purely for validation, even though SAM relies on template.yaml
     if not os.path.exists(config_file) and not os.path.exists('data.yaml'):
-         click.echo(f"Config file for {env} not found (checked {config_file} and data.yaml).")
+         click.echo(f"Config file for {env} not found.")
          return
 
-    perform_sam_deploy(env, stack_name)
+    # Load config to get profile
+    data = load_config(config_file if os.path.exists(config_file) else 'data.yaml')
+    perform_sam_deploy(env, stack_name, data['options'])
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
@@ -314,13 +321,14 @@ def deploy_all(env):
             click.echo(f"Config file for {env} not found.")
             return
 
+    # Load config to get profile for SAM deploy
+    data = load_config(config_file)
+
     # 1. SAM Deploy
     if click.confirm('Deploy Infrastructure (SAM)?', default=True):
-        perform_sam_deploy(env, stack_name)
+        perform_sam_deploy(env, stack_name, data['options'])
 
     # 2. Site Deploy (Build/Upload/Invalidate/Test)
-    # Note: perform_site_deploy does fetch outputs, build, upload, invalidate, and test.
-    # We can ask the user if they want to do this entire block.
     if click.confirm('Build and Upload Site?', default=True):
          perform_site_deploy(env, config_file, stack_name)
 
