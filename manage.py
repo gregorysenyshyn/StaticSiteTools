@@ -224,7 +224,7 @@ def perform_site_deploy(env, config_file, stack_name):
     click.echo(f"  CloudFront ID: {distribution_id}")
     click.echo(f"  Website URL: {website_url}")
 
-    # 3. Update Configuration
+    # Update Configuration
     data['options']['s3_bucket'] = bucket_name
     data['options']['api_url'] = api_url
     data['options']['production'] = (env == 'prod')
@@ -249,9 +249,9 @@ def perform_site_deploy(env, config_file, stack_name):
 
 def get_env_details(env):
     if env == 'dev':
-        return 'data-dev.yaml', 'website-lambdas-dev'
+        return 'data-dev.yaml', 'dev'
     else:
-        return 'data.yaml', 'website-lambdas-prod'
+        return 'data.yaml', 'prod'
 
 # --- CLI Commands ---
 
