@@ -1,0 +1,106 @@
+options:
+  aws_profile_name: ontarioliteracy
+  aws_region_name: us-east-1
+  s3_bucket: REPLACE_WITH_SAM_OUTPUT_BUCKET
+  dist: dist
+  images: images
+  htaccess: src/apache/.htaccess
+  api_url: "REPLACE_WITH_SAM_OUTPUT_API_URL"
+  api_url_local: "/auth"
+  recaptcha_sitekey: '6Lf0AAwrAAAAAEKETmcKGF6TMut32OzSVnGdOhJa'
+  cache_control_age: 259200
+  project_name: ontarioliteracy
+
+# List of secrets to be managed by AWS Secrets Manager and passed to SAM
+secrets:
+  - GoogleClientId
+  - GoogleClientSecret
+  - JwtSecret
+  - OpenAiApiKey
+
+# Additional parameters for SAM template
+parameters:
+  DomainName: ""
+  CertificateArn: ""
+  HostedZoneId: ""
+
+js:
+  search:
+    - src/js/
+  paths:
+    js/scripts.js:
+      - forms.js
+    js/mock-auth.js:
+      - mock-auth.js
+    js/auth.js:
+      - auth.js
+    js/assessment.js:
+      - assessment.js
+    js/thank-you.js:
+      - redirect.js
+    js/uh-oh.js:
+      - redirect.js
+
+
+scss:
+    search:
+      - src/scss/
+    paths:
+      css/style.css:
+        - site-variables.scss
+        - ontarioliteracy.scss
+        - header.scss
+        - footer.scss
+        - contact-privacy.scss
+      css/index.css:
+        - site-variables.scss
+        - index.scss
+      css/osslt.css:
+        - site-variables.scss
+        - osslt.scss
+      css/schools.css:
+        - site-variables.scss
+        - schools.scss
+      css/nav.css:
+        - site-variables.scss
+        - nav.scss
+
+html:
+
+  - files:
+      - src:
+          - src/pages/main/*.html
+          - '!src/pages/main/osslt-practice-tests.html'
+        template: layout.html
+        dest: ''
+    partials:
+      - src/partials/main/*.html
+      - src/partials/main/*.js
+    layouts:
+      - src/layouts/layout.html
+    options:
+      recaptcha: true
+
+  - files:
+      - src:
+          - src/pages/main/osslt-practice-tests.html
+        template: layout.html
+        dest: ''
+      - src:
+          - src/pages/gptlt/*.yaml
+        template: gptlt.html
+        dest: osslt-practice-tests
+      - src:
+          - src/pages/gptlt/single/**/*.yaml
+        template: gptlt-single.html
+        dest: osslt-practice-tests
+    partials:
+      - src/partials/main/*.html
+      - src/partials/osslt/*.html
+    layouts:
+      - src/layouts/layout.html
+      - src/layouts/gptlt.html
+      - src/layouts/gptlt-single.html
+    options:
+      nav: true
+      recaptcha: true
