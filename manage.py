@@ -176,78 +176,37 @@ def invalidate_cloudfront(data, distribution_id):
     waiter.wait(DistributionId=distribution_id, Id=response['Invalidation']['Id'])
     print("Done!")
 
-@click.group()
-def cli():
-    """Management script for building and deploying the website."""
-    pass
+# --- Core Deployment Logic Helpers ---
 
-@cli.command()
-@click.option('--config', default='data-dev.yaml', help='Configuration file to use.')
-def build_local(config):
-    """Builds the website for local development."""
-    data = load_config(config)
-    data['options']['production'] = False
+def perform_sam_deploy(env, stack_name):
+    """Executes SAM build and deploy."""
+    click.echo(f"Building SAM application for {env}...")
+    try:
+        subprocess.check_call(['sam', 'build', '--use-container'])
+    except subprocess.CalledProcessError:
+        click.echo("SAM Build failed.")
+        sys.exit(1)
 
-    # In local mode, we might want to mock API URLs if they aren't provided
-    # The user's data-dev.yaml has `api_url_local: "/auth"`
-    if 'api_url_local' in data['options']:
-         data['options']['api_url'] = data['options']['api_url_local']
+    click.echo(f"Deploying SAM stack: {stack_name}...")
+    deploy_cmd = [
+        'sam', 'deploy',
+        '--stack-name', stack_name,
+        '--parameter-overrides', f'Environment={env}',
+        '--resolve-s3', # Let SAM manage the deployment bucket
+        '--capabilities', 'CAPABILITY_IAM'
+    ]
 
-    build_site(data)
+    try:
+        subprocess.check_call(deploy_cmd)
+    except subprocess.CalledProcessError:
+        click.echo("SAM Deploy failed.")
+        sys.exit(1)
 
-@cli.command()
-@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
-def deploy(env):
-    """Deploys the infrastructure and website."""
-
-    # Setup variables based on environment
-    if env == 'dev':
-        config_file = 'data-dev.yaml'
-        stack_name = 'website-lambdas-dev'
-    else:
-        config_file = 'data.yaml'
-        stack_name = 'website-lambdas-prod' # Assuming prod stack name
-
-    # Load initial config
-    if not os.path.exists(config_file):
-        # Fallback if specific file doesn't exist
-        if os.path.exists('data.yaml'):
-            config_file = 'data.yaml'
-        else:
-            click.echo(f"Config file for {env} not found.")
-            return
-
+def perform_site_deploy(env, config_file, stack_name):
+    """Fetches outputs, builds site, uploads, invalidates, and tests."""
     data = load_config(config_file)
     region = data['options'].get('aws_region_name', 'us-east-1')
 
-    # 1. SAM Deploy
-    if click.confirm('Deploy Infrastructure (SAM)?', default=True):
-        click.echo(f"Building SAM application for {env}...")
-        try:
-            subprocess.check_call(['sam', 'build', '--use-container'])
-        except subprocess.CalledProcessError:
-            click.echo("SAM Build failed.")
-            sys.exit(1)
-
-        click.echo(f"Deploying SAM stack: {stack_name}...")
-        # We rely on samconfig.toml or passed arguments.
-        # Since we want separate stacks, we pass --stack-name.
-        # We also pass the Environment parameter.
-        deploy_cmd = [
-            'sam', 'deploy',
-            '--stack-name', stack_name,
-            '--parameter-overrides', f'Environment={env}',
-            '--resolve-s3', # Let SAM manage the deployment bucket
-            '--capabilities', 'CAPABILITY_IAM'
-        ]
-
-        try:
-            subprocess.check_call(deploy_cmd)
-        except subprocess.CalledProcessError:
-            click.echo("SAM Deploy failed.")
-            sys.exit(1)
-
-    # 2. Get Outputs
     click.echo("Retrieving Stack Outputs...")
     outputs = get_stack_outputs(stack_name, region)
 
@@ -270,32 +229,103 @@ def deploy(env):
     data['options']['api_url'] = api_url
     data['options']['production'] = (env == 'prod')
 
-    # 4. Build and Upload
-    if click.confirm('Build and Upload Site?', default=True):
-        build_site(data)
-        upload_to_s3(data)
+    # Build and Upload
+    build_site(data)
+    upload_to_s3(data)
 
-    # 5. Invalidate CloudFront
-    if distribution_id and click.confirm('Invalidate CloudFront Cache?', default=True):
+    # Invalidate CloudFront
+    if distribution_id:
         invalidate_cloudfront(data, distribution_id)
 
-    # 6. Run API Tests
-    if api_url and click.confirm('Run API Tests?', default=True):
-        # We might need to update the api endpoints in data to use the new api_url
-        # The data.yaml usually has specific endpoints listed.
-        # If the user defines them relative to the base URL in data.yaml, we need to handle that.
-        # But commonly they might be hardcoded or templated.
-        # Let's check how `test_api_endpoints` works. It expects a list of full URLs.
-        # If `api_endpoints` in data.yaml uses the placeholder, we need to replace it.
-
+    # Run API Tests
+    if api_url:
         if 'api_endpoints' in data:
-            # Simple string replacement if the placeholder was used in the list
             updated_endpoints = []
             for endpoint in data['api_endpoints']:
                 updated_endpoints.append(endpoint.replace('REPLACE_WITH_SAM_OUTPUT_API_URL', api_url))
             test_api_endpoints(updated_endpoints)
         else:
              click.echo("No api_endpoints defined in config, skipping tests.")
+
+def get_env_details(env):
+    if env == 'dev':
+        return 'data-dev.yaml', 'website-lambdas-dev'
+    else:
+        return 'data.yaml', 'website-lambdas-prod'
+
+# --- CLI Commands ---
+
+@click.group()
+def cli():
+    """Management script for building and deploying the website."""
+    pass
+
+@cli.command()
+@click.option('--config', default='data-dev.yaml', help='Configuration file to use.')
+def build_local(config):
+    """Builds the website for local development."""
+    data = load_config(config)
+    data['options']['production'] = False
+
+    if 'api_url_local' in data['options']:
+         data['options']['api_url'] = data['options']['api_url_local']
+
+    build_site(data)
+
+@cli.command()
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
+def deploy_infra(env):
+    """Deploys ONLY the SAM infrastructure."""
+    config_file, stack_name = get_env_details(env)
+
+    # Check config existence purely for validation, even though SAM relies on template.yaml
+    if not os.path.exists(config_file) and not os.path.exists('data.yaml'):
+         click.echo(f"Config file for {env} not found (checked {config_file} and data.yaml).")
+         return
+
+    perform_sam_deploy(env, stack_name)
+
+@cli.command()
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
+def deploy_site(env):
+    """Deploys ONLY the website code (Build -> Upload -> Invalidate)."""
+    config_file, stack_name = get_env_details(env)
+
+    if not os.path.exists(config_file):
+        if os.path.exists('data.yaml'):
+            config_file = 'data.yaml'
+        else:
+            click.echo(f"Config file for {env} not found.")
+            return
+
+    perform_site_deploy(env, config_file, stack_name)
+
+@cli.command()
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
+def deploy_all(env):
+    """Interactive wizard to deploy infrastructure and/or website."""
+
+    config_file, stack_name = get_env_details(env)
+
+    if not os.path.exists(config_file):
+        if os.path.exists('data.yaml'):
+            config_file = 'data.yaml'
+        else:
+            click.echo(f"Config file for {env} not found.")
+            return
+
+    # 1. SAM Deploy
+    if click.confirm('Deploy Infrastructure (SAM)?', default=True):
+        perform_sam_deploy(env, stack_name)
+
+    # 2. Site Deploy (Build/Upload/Invalidate/Test)
+    # Note: perform_site_deploy does fetch outputs, build, upload, invalidate, and test.
+    # We can ask the user if they want to do this entire block.
+    if click.confirm('Build and Upload Site?', default=True):
+         perform_site_deploy(env, config_file, stack_name)
+
+# Alias for backward compatibility / ease of use
+cli.add_command(deploy_all, name='deploy')
 
 if __name__ == '__main__':
     cli()
