@@ -1,66 +1,288 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Serverless application for website lambdas
+  SAM Template for Ontario Literacy Lambda Functions and Website Infrastructure
 
 Parameters:
-  VerifiedEmail:
+  Environment:
     Type: String
-    Description: Email address verified in SES
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment name (dev or prod)
+
+  DomainName:
+    Type: String
     Default: ""
-  EmailArn:
+    Description: (Optional) The domain name for the website. Leave blank for default CloudFront URL.
+
+  CertificateArn:
     Type: String
-    Description: ARN of the verified email
     Default: ""
-  GoogleRecaptchaKey:
+    Description: (Optional) ARN of the ACM Certificate. Required if DomainName is provided.
+
+  HostedZoneId:
     Type: String
-    Description: Google Recaptcha Site Key
     Default: ""
-  GoogleApiKey:
+    Description: (Optional) Route53 Hosted Zone ID. Required if DomainName is provided.
+
+  GoogleClientId:
     Type: String
-    Description: Google API Key
-    Default: ""
-  LambdaExecutionRole:
+    Description: Google OAuth Client ID
+    NoEcho: true
+
+  GoogleClientSecret:
     Type: String
-    Description: IAM Role ARN for the Lambda function
+    Description: Google OAuth Client Secret
+    NoEcho: true
+
+  JwtSecret:
+    Type: String
+    Description: Secret key for signing JWTs
+    NoEcho: true
+
+  OpenAiApiKey:
+    Type: String
+    Description: API Key for OpenAI
+    NoEcho: true
+
+  SnsWebFormTopicArn:
+    Type: String
+    Description: ARN of the SNS Topic for web forms
+    Default: "arn:aws:sns:us-east-1:532640115648:webForm"
+
+  SnsEmailGregTopicArn:
+    Type: String
+    Description: ARN of the SNS Topic for emailing Greg
+    Default: "arn:aws:sns:us-east-1:532640115648:email-greg"
+
+  SnsConversionTopicArn:
+    Type: String
+    Description: ARN of the SNS Topic for conversion analytics
+    Default: "arn:aws:sns:us-east-1:532640115648:conversionAnalytics"
+
+  PurchaseRedirectUrl:
+    Type: String
+    Description: URL to redirect to after purchase
+    Default: "https://asyncacademy.ca/landing/success"
 
 Globals:
   Function:
-    Timeout: 10
-    MemorySize: 128
+    Timeout: 30
+    Runtime: python3.14
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        # Pass environment info to Lambdas if needed
+        ENV: !Ref Environment
+        FRONTEND_DOMAIN: !If [HasDomain, !Sub "https://${DomainName}", !Sub "https://${WebsiteCloudFrontDistribution.DomainName}"]
+        REDIRECT_URI: !Sub "https://${WebsiteApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/auth/google/callback"
+        GOOGLE_CLIENT_ID: !Ref GoogleClientId
+        GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
+        JWT_SECRET: !Ref JwtSecret
+        OPENAI_API_KEY: !Ref OpenAiApiKey
+        SNS_WEB_FORM_TOPIC_ARN: !Ref SnsWebFormTopicArn
+        SNS_EMAIL_GREG_TOPIC_ARN: !Ref SnsEmailGregTopicArn
+
+Conditions:
+  HasDomain: !Not [!Equals [!Ref DomainName, ""]]
 
 Resources:
+  # --------------------------------------------------------------------------
+  # API Gateway
+  # --------------------------------------------------------------------------
   WebsiteApi:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: Prod
+      StageName: !Ref Environment
       Cors:
-        AllowMethods: "'POST,OPTIONS'"
-        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Session-Token'"
         AllowOrigin: "'*'"
 
-  ContactFormFunction:
+  # --------------------------------------------------------------------------
+  # S3 Bucket for Website Hosting
+  # --------------------------------------------------------------------------
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      # If DomainName is provided, use it as the bucket name (legacy behavior for prod).
+      # Otherwise, let CloudFormation generate a unique name.
+      BucketName: !If [HasDomain, !Ref DomainName, !Ref "AWS::NoValue"]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  # Origin Access Control (OAC) for CloudFront to access S3
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-OAC"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # Bucket Policy to allow CloudFront OAC access
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "arn:aws:s3:::${WebsiteBucket}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${WebsiteCloudFrontDistribution}"
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "s3:*"
+            Resource:
+              - !Sub "arn:aws:s3:::${WebsiteBucket}"
+              - !Sub "arn:aws:s3:::${WebsiteBucket}/*"
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+                - "arn:aws:iam::281625459120:root"
+            Action: "s3:*"
+            Resource:
+              - !Sub "arn:aws:s3:::${WebsiteBucket}"
+              - !Sub "arn:aws:s3:::${WebsiteBucket}/*"
+
+  # --------------------------------------------------------------------------
+  # CloudFront Distribution
+  # --------------------------------------------------------------------------
+  WebsiteCloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            OriginAccessControlId: !Ref CloudFrontOriginAccessControl
+            S3OriginConfig: {}
+        Enabled: true
+        DefaultRootObject: index
+
+        # Only set Aliases if a domain is provided
+        Aliases: !If [HasDomain, [!Ref DomainName], !Ref "AWS::NoValue"]
+
+        # Use Custom Certificate if Domain is provided, else use Default CloudFront Cert
+        ViewerCertificate:
+          !If
+          - HasDomain
+          - AcmCertificateArn: !Ref CertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
+
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+
+  # --------------------------------------------------------------------------
+  # Route53 Record for the Domain (Only created if DomainName is provided)
+  # --------------------------------------------------------------------------
+  WebsiteDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasDomain
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2 # CloudFront's fixed Hosted Zone ID
+        DNSName: !GetAtt WebsiteCloudFrontDistribution.DomainName
+
+  # --------------------------------------------------------------------------
+  # Lambda Functions
+  # --------------------------------------------------------------------------
+  OauthFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: contact_form/
-      Handler: contact.lambda_handler
-      Runtime: python3.9
-      Role: !Ref LambdaExecutionRole
-      Environment:
-        Variables:
-          VERIFIED_EMAIL: !Ref VerifiedEmail
-          EMAIL_ARN: !Ref EmailArn
-          GOOGLE_RECAPTCHA_KEY: !Ref GoogleRecaptchaKey
-          GOOGLE_API_KEY: !Ref GoogleApiKey
+      CodeUri: src/aws/lambda/auth/
+      Handler: auth.lambda_handler
       Events:
-        ContactApi:
+        AuthProxy:
           Type: Api
           Properties:
             RestApiId: !Ref WebsiteApi
-            Path: /contact
+            Path: /auth/{proxy+}
+            Method: any
+
+  FormHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/aws/lambda/formHandler/
+      Handler: form_handler.lambda_handler
+      Events:
+        FormEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /form
             Method: post
 
+  TestScoringFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/aws/lambda/scoring/
+      Handler: scoring.handler
+      Events:
+        ScoringEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /scoring
+            Method: post
+
+  PurchaseRedirectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/aws/lambda/purchaseRedirect/
+      Handler: purchase_redirect.lambda_handler
+      Environment:
+        Variables:
+          SNS_CONVERSION_TOPIC_ARN: !Ref SnsConversionTopicArn
+          PURCHASE_REDIRECT_URL: !Ref PurchaseRedirectUrl
+
 Outputs:
-  WebsiteApiUrl:
-    Description: "API Gateway endpoint URL for Prod stage"
-    Value: !Sub "https://${WebsiteApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  WebsiteBucketName:
+    Description: Name of the S3 bucket
+    Value: !Ref WebsiteBucket
+  CloudFrontDistributionId:
+    Description: CloudFront Distribution ID
+    Value: !Ref WebsiteCloudFrontDistribution
+  WebsiteURL:
+    Description: URL of the website
+    Value: !If [HasDomain, !Sub "https://${DomainName}", !Sub "https://${WebsiteCloudFrontDistribution.DomainName}"]
+  ApiUrl:
+    Description: URL of the API Gateway
+    Value: !Sub "https://${WebsiteApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
