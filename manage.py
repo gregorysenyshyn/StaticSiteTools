@@ -74,7 +74,7 @@ def ensure_secrets(secrets_list, options, env):
     """
     Ensures that required secrets exist in AWS Secrets Manager.
     If missing, prompts the user to create them.
-    Returns a dict of parameter overrides using dynamic references.
+    Returns a dict of parameter overrides using dynamic references (ARNs).
     """
     if not secrets_list:
         return {}
@@ -91,27 +91,47 @@ def ensure_secrets(secrets_list, options, env):
         secret_name = f"/{project_name}/{env}/{secret_key}"
 
         try:
-            client.describe_secret(SecretId=secret_name)
+            response = client.describe_secret(SecretId=secret_name)
             click.echo(f"  Found secret: {secret_name}")
+            secret_arn = response['ARN']
         except client.exceptions.ResourceNotFoundException:
             click.echo(f"  MISSING secret: {secret_name}")
             value = click.prompt(f"  Enter value for {secret_key}", hide_input=True)
 
             click.echo(f"  Creating secret {secret_name}...")
-            client.create_secret(Name=secret_name, SecretString=value)
+            response = client.create_secret(Name=secret_name, SecretString=value)
             click.echo("  Secret created.")
+            secret_arn = response['ARN']
         except client.exceptions.ClientError as e:
             click.echo(f"  Error checking secret {secret_name}: {e}")
             sys.exit(1)
 
-        # Construct the dynamic reference string for CloudFormation
-        # {{resolve:secretsmanager:SecretId}}
-        # Note: If we were retrieving specific JSON keys, syntax would be different.
-        # Here we assume the secret *is* the value (plaintext).
-        secret_overrides[secret_key] = f"{{{{resolve:secretsmanager:{secret_name}}}}}"
+        # Construct the dynamic reference string for CloudFormation using full ARN
+        # {{resolve:secretsmanager:SECRET_ARN}}
+        secret_overrides[secret_key] = f"{{{{resolve:secretsmanager:{secret_arn}}}}}"
 
     click.echo("All secrets verified.\n")
     return secret_overrides
+
+def check_stack_status(stack_name, options):
+    """Checks the status of the stack and offers to delete if stuck."""
+    client = get_client('cloudformation', options)
+    try:
+        response = client.describe_stacks(StackName=stack_name)
+        if 'Stacks' in response and len(response['Stacks']) > 0:
+            status = response['Stacks'][0]['StackStatus']
+            if status == 'ROLLBACK_COMPLETE':
+                click.echo(f"\nWarning: Stack {stack_name} is in {status} state.")
+                if click.confirm("Do you want to delete this stack before redeploying?", default=True):
+                    click.echo(f"Deleting stack {stack_name}...")
+                    client.delete_stack(StackName=stack_name)
+                    click.echo("Deletion initiated. Waiting for stack to be deleted...")
+                    waiter = client.get_waiter('stack_delete_complete')
+                    waiter.wait(StackName=stack_name)
+                    click.echo("Stack deleted.")
+    except client.exceptions.ClientError:
+        # Stack doesn't exist, which is fine
+        pass
 
 def build_site(data):
     """Builds the static website using website.tools."""
@@ -256,6 +276,9 @@ def invalidate_cloudfront(data, distribution_id):
 def perform_sam_deploy(env, stack_name, data):
     """Executes SAM build and deploy."""
 
+    # Check stack status and offer cleanup
+    check_stack_status(stack_name, data['options'])
+
     # Identify secrets dynamically from template.yaml (NoEcho: true)
     # Merge with any explicitly defined secrets in config
     inferred_secrets = parse_template_parameters()
@@ -295,6 +318,9 @@ def perform_sam_deploy(env, stack_name, data):
         overrides_list = []
         for key, value in combined_overrides.items():
             overrides_list.append(f"{key}={value}")
+
+        # Debug output
+        click.echo(f"Passing overrides: {overrides_list}")
 
         # Insert into command
         param_idx = deploy_cmd.index('--parameter-overrides')
