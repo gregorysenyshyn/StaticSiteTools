@@ -16,12 +16,43 @@ from shared.client import get_client
 from website import tools
 from website.test_api import test_api_endpoints
 
+# Configure PyYAML to ignore CloudFormation tags
+def cfn_constructor(loader, node):
+    return str(node.value)
+
+for tag in ['!Ref', '!Sub', '!GetAtt', '!Equals', '!Not', '!If', '!Join', '!Select', '!Split', '!FindInMap', '!Base64', '!Cidr', '!And', '!Or', '!Condition']:
+    yaml.add_constructor(tag, cfn_constructor, Loader=yaml.SafeLoader)
+    yaml.add_constructor(tag, cfn_constructor, Loader=yaml.FullLoader) # In case FullLoader is used
+
 def load_config(config_file):
     """Loads the YAML configuration file."""
     if not os.path.exists(config_file):
         click.echo(f"Error: Configuration file {config_file} not found.")
         sys.exit(1)
     return utils.load_yaml(config_file)
+
+def parse_template_parameters(template_file='template.yaml'):
+    """
+    Parses template.yaml to find parameters marked with NoEcho: true.
+    Returns a list of parameter names that should be treated as secrets.
+    """
+    if not os.path.exists(template_file):
+        click.echo(f"Warning: {template_file} not found. Cannot infer secrets.")
+        return []
+
+    try:
+        with open(template_file, 'r') as f:
+            template = yaml.load(f, Loader=yaml.SafeLoader)
+
+        secrets = []
+        if 'Parameters' in template:
+            for param_name, properties in template['Parameters'].items():
+                if properties.get('NoEcho') is True:
+                    secrets.append(param_name)
+        return secrets
+    except Exception as e:
+        click.echo(f"Warning: Failed to parse {template_file}: {e}")
+        return []
 
 def get_stack_outputs(stack_name, region, options):
     """Retrieves outputs from a CloudFormation stack."""
@@ -225,10 +256,16 @@ def invalidate_cloudfront(data, distribution_id):
 def perform_sam_deploy(env, stack_name, data):
     """Executes SAM build and deploy."""
 
-    # Verify secrets if configured and get dynamic references
-    secret_overrides = {}
-    if 'secrets' in data:
-        secret_overrides = ensure_secrets(data['secrets'], data['options'], env)
+    # Identify secrets dynamically from template.yaml (NoEcho: true)
+    # Merge with any explicitly defined secrets in config
+    inferred_secrets = parse_template_parameters()
+    configured_secrets = data.get('secrets', [])
+
+    # Combine lists, removing duplicates
+    all_secrets = list(set(inferred_secrets + configured_secrets))
+
+    # Verify secrets and get dynamic references
+    secret_overrides = ensure_secrets(all_secrets, data['options'], env)
 
     click.echo(f"Building SAM application for {env}...")
     try:
@@ -247,7 +284,7 @@ def perform_sam_deploy(env, stack_name, data):
     ]
 
     # Combine config parameters and secret overrides
-    # secret overrides take precedence if conflict (though keys should differ)
+    # secret overrides take precedence if conflict
     combined_overrides = {}
     if 'parameters' in data and data['parameters']:
         combined_overrides.update(data['parameters'])
