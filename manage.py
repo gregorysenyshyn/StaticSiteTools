@@ -39,33 +39,48 @@ def get_stack_outputs(stack_name, region, options):
             outputs[output['OutputKey']] = output['OutputValue']
     return outputs
 
-def verify_secrets(secrets_list, options):
-    """Verifies that the required secrets exist in AWS Secrets Manager."""
+def ensure_secrets(secrets_list, options, env):
+    """
+    Ensures that required secrets exist in AWS Secrets Manager.
+    If missing, prompts the user to create them.
+    Returns a dict of parameter overrides using dynamic references.
+    """
     if not secrets_list:
-        return
+        return {}
 
-    click.echo("\nVerifying Secrets...")
+    click.echo("\nVerifying Secrets in AWS Secrets Manager...")
     client = get_client('secretsmanager', options)
-    missing_secrets = []
 
-    for secret_name in secrets_list:
+    # Use aws_profile_name as project_name, default to 'website' if missing
+    project_name = options.get('aws_profile_name', 'website')
+    secret_overrides = {}
+
+    for secret_key in secrets_list:
+        # Construct the secret name convention: /project/env/Key
+        secret_name = f"/{project_name}/{env}/{secret_key}"
+
         try:
             client.describe_secret(SecretId=secret_name)
             click.echo(f"  Found secret: {secret_name}")
         except client.exceptions.ResourceNotFoundException:
             click.echo(f"  MISSING secret: {secret_name}")
-            missing_secrets.append(secret_name)
+            value = click.prompt(f"  Enter value for {secret_key}", hide_input=True)
+
+            click.echo(f"  Creating secret {secret_name}...")
+            client.create_secret(Name=secret_name, SecretString=value)
+            click.echo("  Secret created.")
         except client.exceptions.ClientError as e:
             click.echo(f"  Error checking secret {secret_name}: {e}")
-            missing_secrets.append(secret_name)
+            sys.exit(1)
 
-    if missing_secrets:
-        click.echo("\nError: The following required secrets are missing from AWS Secrets Manager:")
-        for s in missing_secrets:
-            click.echo(f"  - {s}")
-        click.echo("Please create them before deploying.")
-        sys.exit(1)
+        # Construct the dynamic reference string for CloudFormation
+        # {{resolve:secretsmanager:SecretId}}
+        # Note: If we were retrieving specific JSON keys, syntax would be different.
+        # Here we assume the secret *is* the value (plaintext).
+        secret_overrides[secret_key] = f"{{{{resolve:secretsmanager:{secret_name}}}}}"
+
     click.echo("All secrets verified.\n")
+    return secret_overrides
 
 def build_site(data):
     """Builds the static website using website.tools."""
@@ -210,9 +225,10 @@ def invalidate_cloudfront(data, distribution_id):
 def perform_sam_deploy(env, stack_name, data):
     """Executes SAM build and deploy."""
 
-    # Verify secrets if configured
+    # Verify secrets if configured and get dynamic references
+    secret_overrides = {}
     if 'secrets' in data:
-        verify_secrets(data['secrets'], data['options'])
+        secret_overrides = ensure_secrets(data['secrets'], data['options'], env)
 
     click.echo(f"Building SAM application for {env}...")
     try:
@@ -230,30 +246,22 @@ def perform_sam_deploy(env, stack_name, data):
         '--capabilities', 'CAPABILITY_IAM'
     ]
 
-    # Add extra parameters from config
+    # Combine config parameters and secret overrides
+    # secret overrides take precedence if conflict (though keys should differ)
+    combined_overrides = {}
     if 'parameters' in data and data['parameters']:
-        overrides = []
-        for key, value in data['parameters'].items():
-            overrides.append(f"{key}={value}")
+        combined_overrides.update(data['parameters'])
+    combined_overrides.update(secret_overrides)
 
-        # Note: --parameter-overrides takes a space-separated list
-        # We need to be careful appending to the list.
-        # It's cleaner to append individual Key=Value strings to the main list
-        # BUT sam deploy expects "--parameter-overrides Key1=Val1 Key2=Val2"
-        # Since we already added "Environment={env}" to the list above...
+    if combined_overrides:
+        # Construct the overrides list
+        overrides_list = []
+        for key, value in combined_overrides.items():
+            overrides_list.append(f"{key}={value}")
 
-        # Actually, let's restructure to be safe.
-        # We have one entry: f'Environment={env}'
-        # We should append the others to the deploy_cmd list as separate arguments IF we weren't grouping them.
-        # But 'sam deploy' usually takes multiple arguments after --parameter-overrides
-
-        # Correct approach for subprocess list:
-        # ['--parameter-overrides', 'Env=val', 'Key=Val']
-
-        # Let's find the index of --parameter-overrides and insert/append
+        # Insert into command
         param_idx = deploy_cmd.index('--parameter-overrides')
-        # Append to the arguments following that flag
-        for item in overrides:
+        for item in overrides_list:
             deploy_cmd.insert(param_idx + 2, item)
 
     # Add region if specified in config, otherwise default to us-east-1
