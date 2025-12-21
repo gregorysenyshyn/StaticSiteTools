@@ -39,6 +39,34 @@ def get_stack_outputs(stack_name, region, options):
             outputs[output['OutputKey']] = output['OutputValue']
     return outputs
 
+def verify_secrets(secrets_list, options):
+    """Verifies that the required secrets exist in AWS Secrets Manager."""
+    if not secrets_list:
+        return
+
+    click.echo("\nVerifying Secrets...")
+    client = get_client('secretsmanager', options)
+    missing_secrets = []
+
+    for secret_name in secrets_list:
+        try:
+            client.describe_secret(SecretId=secret_name)
+            click.echo(f"  Found secret: {secret_name}")
+        except client.exceptions.ResourceNotFoundException:
+            click.echo(f"  MISSING secret: {secret_name}")
+            missing_secrets.append(secret_name)
+        except client.exceptions.ClientError as e:
+            click.echo(f"  Error checking secret {secret_name}: {e}")
+            missing_secrets.append(secret_name)
+
+    if missing_secrets:
+        click.echo("\nError: The following required secrets are missing from AWS Secrets Manager:")
+        for s in missing_secrets:
+            click.echo(f"  - {s}")
+        click.echo("Please create them before deploying.")
+        sys.exit(1)
+    click.echo("All secrets verified.\n")
+
 def build_site(data):
     """Builds the static website using website.tools."""
     print('\nStarting build!')
@@ -179,8 +207,13 @@ def invalidate_cloudfront(data, distribution_id):
 
 # --- Core Deployment Logic Helpers ---
 
-def perform_sam_deploy(env, stack_name, options):
+def perform_sam_deploy(env, stack_name, data):
     """Executes SAM build and deploy."""
+
+    # Verify secrets if configured
+    if 'secrets' in data:
+        verify_secrets(data['secrets'], data['options'])
+
     click.echo(f"Building SAM application for {env}...")
     try:
         subprocess.check_call(['sam', 'build', '--use-container'])
@@ -197,13 +230,39 @@ def perform_sam_deploy(env, stack_name, options):
         '--capabilities', 'CAPABILITY_IAM'
     ]
 
+    # Add extra parameters from config
+    if 'parameters' in data and data['parameters']:
+        overrides = []
+        for key, value in data['parameters'].items():
+            overrides.append(f"{key}={value}")
+
+        # Note: --parameter-overrides takes a space-separated list
+        # We need to be careful appending to the list.
+        # It's cleaner to append individual Key=Value strings to the main list
+        # BUT sam deploy expects "--parameter-overrides Key1=Val1 Key2=Val2"
+        # Since we already added "Environment={env}" to the list above...
+
+        # Actually, let's restructure to be safe.
+        # We have one entry: f'Environment={env}'
+        # We should append the others to the deploy_cmd list as separate arguments IF we weren't grouping them.
+        # But 'sam deploy' usually takes multiple arguments after --parameter-overrides
+
+        # Correct approach for subprocess list:
+        # ['--parameter-overrides', 'Env=val', 'Key=Val']
+
+        # Let's find the index of --parameter-overrides and insert/append
+        param_idx = deploy_cmd.index('--parameter-overrides')
+        # Append to the arguments following that flag
+        for item in overrides:
+            deploy_cmd.insert(param_idx + 2, item)
+
     # Add region if specified in config, otherwise default to us-east-1
-    region = options.get('aws_region_name', 'us-east-1')
+    region = data['options'].get('aws_region_name', 'us-east-1')
     deploy_cmd.extend(['--region', region])
 
     # Add profile if specified in config
-    if 'aws_profile_name' in options:
-        deploy_cmd.extend(['--profile', options['aws_profile_name']])
+    if 'aws_profile_name' in data['options']:
+        deploy_cmd.extend(['--profile', data['options']['aws_profile_name']])
 
     try:
         subprocess.check_call(deploy_cmd)
@@ -294,7 +353,7 @@ def deploy_infra(env):
 
     # Load config to get profile
     data = load_config(config_file if os.path.exists(config_file) else 'data.yaml')
-    perform_sam_deploy(env, stack_name, data['options'])
+    perform_sam_deploy(env, stack_name, data)
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
@@ -330,7 +389,7 @@ def deploy_all(env):
 
     # 1. SAM Deploy
     if click.confirm('Deploy Infrastructure (SAM)?', default=True):
-        perform_sam_deploy(env, stack_name, data['options'])
+        perform_sam_deploy(env, stack_name, data)
 
     # 2. Site Deploy (Build/Upload/Invalidate/Test)
     if click.confirm('Build and Upload Site?', default=True):
