@@ -224,7 +224,7 @@ def perform_site_deploy(env, config_file, stack_name):
     click.echo(f"  CloudFront ID: {distribution_id}")
     click.echo(f"  Website URL: {website_url}")
 
-    # Update Configuration
+    # 3. Update Configuration
     data['options']['s3_bucket'] = bucket_name
     data['options']['api_url'] = api_url
     data['options']['production'] = (env == 'prod')
