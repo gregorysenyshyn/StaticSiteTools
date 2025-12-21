@@ -36,6 +36,7 @@ def parse_template_parameters(template_file='template.yaml'):
     Parses template.yaml to find parameters marked with NoEcho: true.
     Returns a list of parameter names that should be treated as secrets.
     """
+    click.echo(f"Parsing template for secrets: {os.path.abspath(template_file)}")
     if not os.path.exists(template_file):
         click.echo(f"Warning: {template_file} not found. Cannot infer secrets.")
         return []
@@ -49,6 +50,12 @@ def parse_template_parameters(template_file='template.yaml'):
             for param_name, properties in template['Parameters'].items():
                 if properties.get('NoEcho') is True:
                     secrets.append(param_name)
+
+        if not secrets:
+            click.echo("No parameters with 'NoEcho: true' found in template.")
+        else:
+            click.echo(f"Found secret parameters: {secrets}")
+
         return secrets
     except Exception as e:
         click.echo(f"Warning: Failed to parse {template_file}: {e}")
@@ -115,12 +122,21 @@ def ensure_secrets(secrets_list, options, env):
 
 def check_stack_status(stack_name, options):
     """Checks the status of the stack and offers to delete if stuck."""
+    click.echo(f"Checking status of stack {stack_name}...")
     client = get_client('cloudformation', options)
     try:
         response = client.describe_stacks(StackName=stack_name)
         if 'Stacks' in response and len(response['Stacks']) > 0:
             status = response['Stacks'][0]['StackStatus']
-            if status == 'ROLLBACK_COMPLETE':
+            # Expanded list of failed/stuck states
+            failed_states = [
+                'ROLLBACK_COMPLETE',
+                'ROLLBACK_FAILED',
+                'CREATE_FAILED',
+                'REVIEW_IN_PROGRESS',
+                'DELETE_FAILED'
+            ]
+            if status in failed_states:
                 click.echo(f"\nWarning: Stack {stack_name} is in {status} state.")
                 if click.confirm("Do you want to delete this stack before redeploying?", default=True):
                     click.echo(f"Deleting stack {stack_name}...")
@@ -131,6 +147,7 @@ def check_stack_status(stack_name, options):
                     click.echo("Stack deleted.")
     except client.exceptions.ClientError:
         # Stack doesn't exist, which is fine
+        click.echo("Stack does not exist (clean state).")
         pass
 
 def build_site(data):
