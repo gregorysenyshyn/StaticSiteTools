@@ -197,6 +197,10 @@ def perform_sam_deploy(env, stack_name, options):
         '--capabilities', 'CAPABILITY_IAM'
     ]
 
+    # Add region if specified in config, otherwise default to us-east-1
+    region = options.get('aws_region_name', 'us-east-1')
+    deploy_cmd.extend(['--region', region])
+
     # Add profile if specified in config
     if 'aws_profile_name' in options:
         deploy_cmd.extend(['--profile', options['aws_profile_name']])
