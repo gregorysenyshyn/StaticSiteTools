@@ -145,6 +145,10 @@ def upload_to_s3(data):
         # Calculate destination key
         destname = filename[len(dist_dir)+1:]
 
+        # Strip .html extension for clean URLs on S3/CloudFront
+        if destname.endswith('.html'):
+            destname = destname[:-5]
+
         # Determine if we should handle this file (mimicking send_it.py logic logic roughly, but cleaner)
         # send_it.py had specific checks for html, js/, css/, images/.
         # We'll just upload everything in dist unless it's hidden.
