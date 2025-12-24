@@ -8,6 +8,7 @@ import click
 import subprocess
 import boto3
 import yaml
+import shutil
 
 # Ensure we can import from local modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -294,8 +295,60 @@ def invalidate_cloudfront(data, distribution_id):
 
 # --- Core Deployment Logic Helpers ---
 
+def perform_shared_deploy(env, stack_name, data):
+    """Executes SAM deploy for the shared infrastructure stack."""
+
+    # Check stack status and offer cleanup
+    check_stack_status(stack_name, data['options'])
+
+    click.echo(f"Deploying Shared Infrastructure (Assets) for {env}...")
+    click.echo(f"Stack Name: {stack_name}")
+
+    deploy_cmd = [
+        'sam', 'deploy',
+        '--template-file', 'template-shared.yaml',
+        '--stack-name', stack_name,
+        '--resolve-s3',
+        '--capabilities', 'CAPABILITY_IAM'
+    ]
+
+    # Add parameters
+    # HostedZoneId is required for the shared template
+    hosted_zone_id = data.get('parameters', {}).get('HostedZoneId')
+    if not hosted_zone_id:
+        # Fallback to config root if not in parameters block
+        hosted_zone_id = data.get('HostedZoneId')
+
+    if not hosted_zone_id:
+        click.echo("Error: HostedZoneId is required for shared deployment. Please add it to data.yaml or data-dev.yaml.")
+        sys.exit(1)
+
+    overrides_list = [f"HostedZoneId={hosted_zone_id}"]
+    deploy_cmd.extend(['--parameter-overrides'] + overrides_list)
+
+    # Add region if specified in config
+    region = data['options'].get('aws_region_name', 'us-east-1')
+    deploy_cmd.extend(['--region', region])
+
+    # Add profile if specified in config
+    if 'aws_profile_name' in data['options']:
+        deploy_cmd.extend(['--profile', data['options']['aws_profile_name']])
+
+    try:
+        subprocess.check_call(deploy_cmd)
+        click.echo("Shared Infrastructure Deployed Successfully.")
+    except subprocess.CalledProcessError:
+        click.echo("Shared Infrastructure Deploy failed.")
+        sys.exit(1)
+
 def perform_sam_deploy(env, stack_name, data):
     """Executes SAM build and deploy."""
+
+    # Pre-build cleanup to avoid symlink errors in Docker/SAM
+    dist_dir = data['options'].get('dist', 'dist')
+    if os.path.exists(dist_dir):
+        click.echo(f"Removing {dist_dir} to prevent build errors...")
+        shutil.rmtree(dist_dir, ignore_errors=True)
 
     # Check stack status and offer cleanup
     check_stack_status(stack_name, data['options'])
@@ -435,6 +488,30 @@ def build_local(config):
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
+def deploy_shared(env):
+    """Deploys ONLY the SHARED assets infrastructure."""
+    config_file, _ = get_env_details(env) # we just need config file to load params
+
+    if not os.path.exists(config_file):
+        if os.path.exists('data.yaml'):
+            config_file = 'data.yaml'
+        else:
+            click.echo(f"Config file for {env} not found.")
+            return
+
+    data = load_config(config_file)
+    stack_name = data.get('parameters', {}).get('shared_stack_name')
+    if not stack_name:
+        stack_name = data.get('shared_stack_name')
+
+    if not stack_name:
+        click.echo("Error: shared_stack_name must be defined in data.yaml/data-dev.yaml")
+        sys.exit(1)
+
+    perform_shared_deploy(env, stack_name, data)
+
+@cli.command()
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
 def deploy_infra(env):
     """Deploys ONLY the SAM infrastructure."""
     config_file, stack_name = get_env_details(env)
@@ -479,11 +556,19 @@ def deploy_all(env):
     # Load config to get profile for SAM deploy
     data = load_config(config_file)
 
-    # 1. SAM Deploy
+    # 1. Shared Infrastructure (Optional)
+    if click.confirm('Deploy Shared Infrastructure (Assets)?', default=False):
+        shared_stack = data.get('parameters', {}).get('shared_stack_name') or data.get('shared_stack_name')
+        if shared_stack:
+            perform_shared_deploy(env, shared_stack, data)
+        else:
+            click.echo("Warning: shared_stack_name not found, skipping shared deploy.")
+
+    # 2. SAM Deploy
     if click.confirm('Deploy Infrastructure (SAM)?', default=True):
         perform_sam_deploy(env, stack_name, data)
 
-    # 2. Site Deploy (Build/Upload/Invalidate/Test)
+    # 3. Site Deploy (Build/Upload/Invalidate/Test)
     if click.confirm('Build and Upload Site?', default=True):
          perform_site_deploy(env, config_file, stack_name)
 
