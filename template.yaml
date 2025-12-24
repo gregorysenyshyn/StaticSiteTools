@@ -273,6 +273,25 @@ Resources:
           SNS_CONVERSION_TOPIC_ARN: !Ref SnsConversionTopicArn
           PURCHASE_REDIRECT_URL: !Ref PurchaseRedirectUrl
 
+  NewLeadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/aws/lambda/newLead/
+      Handler: new_lead.lambda_handler
+      Events:
+        NewLeadTrigger:
+          Type: SNS
+          Properties:
+            Topic: !Ref SnsWebFormTopicArn
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:UpdateItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/leads"
+            - Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref SnsEmailGregTopicArn
+
 Outputs:
   WebsiteBucketName:
     Description: Name of the S3 bucket
