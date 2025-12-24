@@ -8,6 +8,7 @@ options:
   api_url: "REPLACE_WITH_SAM_OUTPUT_API_URL"
   api_url_local: "/auth"
   recaptcha_sitekey: '6Lf0AAwrAAAAAEKETmcKGF6TMut32OzSVnGdOhJa'
+  stripe_publishable_key: "pk_test_mock123"
   cache_control_age: 259200
   project_name: ontarioliteracy
 
@@ -23,6 +24,27 @@ parameters:
   DomainName: ""
   CertificateArn: ""
   HostedZoneId: ""
+
+test_forms:
+  - name: "Contact Form"
+    partial: "src/partials/callback-form.html"
+    css:
+      - "css/style.css"
+    context:
+      form_title: "Test Contact"
+    prefill:
+      name: "Test User"
+      email: "test@example.com"
+      message: "This is a test message."
+
+  - name: "Stripe Enrollment"
+    partial: "src/partials/stripe-form.html"
+    css:
+      - "css/style.css"
+    context:
+      form_title: "Test Stripe"
+      stripe_price_id: "price_TEST123"
+    prefill: {}
 
 js:
   search:
@@ -104,4 +126,3 @@ html:
     options:
       nav: true
       recaptcha: true
-

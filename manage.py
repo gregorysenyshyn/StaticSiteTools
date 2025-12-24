@@ -178,6 +178,10 @@ def build_site(data):
             tools.build_pageset(pageset, data['options'])
     print(f'Built all pages in {round(float(time.time() - t1), 4)} seconds')
 
+    print('\n\n=== T E S T   P A G E S ===')
+    if 'test_forms' in data:
+        tools.generate_test_pages(data, data['options'])
+
     print('\n\n=== I M A G E S ===')
     if 'images' in data['options']:
         tools.handle_images(data['options'])

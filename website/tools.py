@@ -5,6 +5,7 @@ import time
 import shutil
 import itertools
 import subprocess
+import json
 
 from jinja2 import BaseLoader
 from jinja2 import Environment
@@ -354,3 +355,163 @@ def build_pageset(pageset, options):
             page['data']['nav_pages'] = nav_pages
 
         build_page(page, j2_env, options)
+
+
+def generate_test_pages(data, options):
+    """Generates test pages for forms defined in test_forms."""
+    print(f"\n{time.asctime()} — Generating Test Pages...")
+    test_forms = data.get('test_forms', [])
+    if not test_forms:
+        print("No test_forms found.")
+        return
+
+    dist_test_dir = os.path.join(options['dist'], '_test')
+    os.makedirs(dist_test_dir, exist_ok=True)
+
+    generated_pages = []
+
+    for form in test_forms:
+        form_name = form['name']
+        partial_path = form['partial']
+        css_files = form.get('css', [])
+        context = form.get('context', {}).copy()
+        prefill = form.get('prefill', {})
+
+        # Merge global options into context
+        context['api_url'] = options.get('api_url')
+        context['recaptcha_sitekey'] = options.get('recaptcha_sitekey')
+        context['stripe_publishable_key'] = options.get('stripe_publishable_key')
+
+        print(f"  Generating test page for: {form_name}")
+
+        # Load partial content
+        if not os.path.exists(partial_path):
+             print(f"    Error: Partial {partial_path} not found.")
+             continue
+
+        # Create a Jinja2 environment for the partial
+        # We assume the partial might reference other templates, so we use the directory of the partial
+        partial_dir = os.path.dirname(os.path.abspath(partial_path))
+        j2_env = Environment(loader=GlobLoader([partial_dir]), trim_blocks=True)
+
+        try:
+            template = j2_env.from_string(open(partial_path).read())
+            rendered_partial = template.render(context)
+        except Exception as e:
+            print(f"    Error rendering partial {partial_path}: {e}")
+            continue
+
+        # Generate slug for filename
+        slug = form_name.lower().replace(' ', '-')
+        filename = f"{slug}.html"
+        filepath = os.path.join(dist_test_dir, filename)
+
+        # Build CSS links
+        css_links = ""
+        for css in css_files:
+             # Ensure CSS path is relative to the test page or absolute
+             # Since test pages are in /_test/, and css is likely in /css/, we need ../css/
+             # or just use /css/ if served from root. Let's assume /css/ for simplicity if deployed
+             # but for local file viewing, relative is better.
+             # Actually, options['dist'] structure implies assets are at root of dist.
+             # So from _test/ we need ../
+             link_path = f"../{css}"
+             css_links += f'<link rel="stylesheet" href="{link_path}">\n'
+
+        # Build Prefill Script
+        prefill_json = json.dumps(prefill)
+        prefill_script = f"""
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {{
+                const prefillData = {prefill_json};
+                console.log("Prefilling form with:", prefillData);
+
+                for (const [key, value] of Object.entries(prefillData)) {{
+                    const inputs = document.querySelectorAll(`[name="${{key}}"], [id="${{key}}"]`);
+                    inputs.forEach(input => {{
+                        if (input.type === 'checkbox' || input.type === 'radio') {{
+                            if (input.value === value.toString() || value === true) {{
+                                input.checked = true;
+                            }}
+                        }} else {{
+                            input.value = value;
+                        }}
+                    }});
+                }}
+            }});
+        </script>
+        """
+
+        # Build Full HTML
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test: {form_name}</title>
+    {css_links}
+    <style>
+        body {{ background-color: #f4f4f4; padding: 20px; }}
+        .test-wrapper {{ background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; }}
+        .test-header {{ text-align: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }}
+    </style>
+</head>
+<body>
+    <div class="test-wrapper">
+        <div class="test-header">
+            <h1>Test Mode: {form_name}</h1>
+            <p><a href="index.html">&larr; Back to Test Index</a></p>
+        </div>
+        <div class="test-content">
+            {rendered_partial}
+        </div>
+    </div>
+    {prefill_script}
+</body>
+</html>
+        """
+
+        with open(filepath, 'w') as f:
+            f.write(html_content)
+
+        generated_pages.append({'name': form_name, 'file': filename})
+
+    # Generate Index Page
+    index_path = os.path.join(dist_test_dir, 'index.html')
+    index_list_items = ""
+    for page in generated_pages:
+        index_list_items += f'<li><a href="{page["file"]}">{page["name"]}</a></li>\n'
+
+    index_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Forms Index</title>
+    <style>
+        body {{ font-family: sans-serif; padding: 40px; background: #f0f0f0; }}
+        .container {{ background: white; padding: 40px; border-radius: 8px; max-width: 600px; margin: 0 auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }}
+        h1 {{ margin-top: 0; }}
+        ul {{ line-height: 1.6; }}
+        a {{ text-decoration: none; color: #007bff; font-weight: bold; }}
+        a:hover {{ text-decoration: underline; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Form Verification Mode</h1>
+        <p>Select a form to verify in the Dev environment.</p>
+        <ul>
+            {index_list_items}
+        </ul>
+    </div>
+</body>
+</html>
+    """
+
+    with open(index_path, 'w') as f:
+        f.write(index_content)
+
+    print(f"Generated {len(generated_pages)} test pages and index.")
