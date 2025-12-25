@@ -328,6 +328,24 @@ def invalidate_cloudfront(data, distribution_id):
 
 # --- Core Deployment Logic Helpers ---
 
+def run_api_tests_from_stack(stack_name, data):
+    """Fetches API URL from stack outputs and runs configured tests."""
+    click.echo("\nVerifying API Endpoints...")
+    region = data['options'].get('aws_region_name', 'us-east-1')
+    outputs = get_stack_outputs(stack_name, region, data['options'])
+    api_url = outputs.get('ApiUrl')
+
+    if api_url:
+        if 'api_endpoints' in data:
+            updated_endpoints = []
+            for endpoint in data['api_endpoints']:
+                updated_endpoints.append(endpoint.replace('REPLACE_WITH_SAM_OUTPUT_API_URL', api_url))
+            custom_test_api_endpoints(updated_endpoints)
+        else:
+             click.echo("No api_endpoints defined in config, skipping tests.")
+    else:
+        click.echo("Warning: ApiUrl not found in stack outputs. Skipping API tests.")
+
 def perform_shared_deploy(env, stack_name, data):
     """Executes SAM deploy for the shared infrastructure stack."""
 
@@ -464,6 +482,8 @@ def perform_sam_deploy(env, stack_name, data):
         click.echo("SAM Deploy failed.")
         sys.exit(1)
 
+    run_api_tests_from_stack(stack_name, data)
+
 def perform_site_deploy(env, config_file, stack_name):
     """Fetches outputs, builds site, uploads, invalidates, and tests."""
     data = load_config(config_file)
@@ -499,16 +519,6 @@ def perform_site_deploy(env, config_file, stack_name):
     # Invalidate CloudFront
     if distribution_id:
         invalidate_cloudfront(data, distribution_id)
-
-    # Run API Tests
-    if api_url:
-        if 'api_endpoints' in data:
-            updated_endpoints = []
-            for endpoint in data['api_endpoints']:
-                updated_endpoints.append(endpoint.replace('REPLACE_WITH_SAM_OUTPUT_API_URL', api_url))
-            custom_test_api_endpoints(updated_endpoints)
-        else:
-             click.echo("No api_endpoints defined in config, skipping tests.")
 
 def custom_test_api_endpoints(endpoints):
     """Tests a list of API endpoints handling POST-only routes."""
@@ -642,7 +652,7 @@ def deploy_all(env):
             click.echo("Warning: shared_stack_name not found, skipping shared deploy.")
 
     # 2. SAM Deploy
-    if click.confirm('Deploy Infrastructure (SAM)?', default=True):
+    if click.confirm('Deploy Infrastructure (SAM)?', default=False):
         perform_sam_deploy(env, stack_name, data)
 
     # 3. Site Deploy (Build/Upload/Invalidate/Test)
