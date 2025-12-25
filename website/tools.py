@@ -347,6 +347,7 @@ def build_pageset(pageset, options):
         page['data']['google_ads_id'] = options.get('google_ads_id')
         page['data']['recaptcha_sitekey'] = options.get('recaptcha_sitekey')
         page['data']['api_url'] = options.get('api_url')
+        page['data']['images_url'] = options.get('images_url')
         if options.get('production'):
             page['data']['production'] = True
 
