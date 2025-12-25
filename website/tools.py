@@ -375,11 +375,13 @@ def generate_test_pages(data, options):
         form_name = form['name']
         partial_path = form['partial']
         css_files = form.get('css', [])
+        js_files = form.get('js', [])
         context = form.get('context', {}).copy()
         prefill = form.get('prefill', {})
 
         # Merge global options into context
         context['api_url'] = options.get('api_url')
+        context['images_url'] = options.get('images_url')
         context['recaptcha_sitekey'] = options.get('recaptcha_sitekey')
         context['stripe_publishable_key'] = options.get('stripe_publishable_key')
 
@@ -419,6 +421,12 @@ def generate_test_pages(data, options):
              link_path = f"../{css}"
              css_links += f'<link rel="stylesheet" href="{link_path}">\n'
 
+        # Build JS links
+        js_links = ""
+        for js in js_files:
+             script_path = f"../{js}"
+             js_links += f'<script src="{script_path}" defer></script>\n'
+
         # Build Prefill Script
         prefill_json = json.dumps(prefill)
         prefill_script = f"""
@@ -452,6 +460,7 @@ def generate_test_pages(data, options):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test: {form_name}</title>
     {css_links}
+    {js_links}
     <style>
         body {{ background-color: #f4f4f4; padding: 20px; }}
         .test-wrapper {{ background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; }}
