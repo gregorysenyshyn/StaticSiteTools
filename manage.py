@@ -454,12 +454,26 @@ def perform_sam_deploy(env, stack_name, data):
         click.echo("SAM Deploy failed.")
         sys.exit(1)
 
+    # Run API Tests immediately after deploy
+    region = data['options'].get('aws_region_name', 'us-east-1')
+    outputs = get_stack_outputs(stack_name, region, data['options'])
+    api_url = outputs.get('ApiUrl')
+
+    if api_url:
+        if 'api_endpoints' in data:
+            updated_endpoints = []
+            for endpoint in data['api_endpoints']:
+                updated_endpoints.append(endpoint.replace('REPLACE_WITH_SAM_OUTPUT_API_URL', api_url))
+            custom_test_api_endpoints(updated_endpoints)
+        else:
+             click.echo("No api_endpoints defined in config, skipping tests.")
+
 def perform_site_deploy(env, config_file, stack_name):
     """Fetches outputs, builds site, uploads, invalidates, and tests."""
     data = load_config(config_file)
     region = data['options'].get('aws_region_name', 'us-east-1')
 
-    click.echo("Retrieving Stack Outputs...")
+    click.echo("Retrieving Stack Outputs (silent)...")
     # Pass options so get_client uses the correct profile
     outputs = get_stack_outputs(stack_name, region, data['options'])
 
@@ -471,11 +485,6 @@ def perform_site_deploy(env, config_file, stack_name):
     if not bucket_name:
         click.echo("Error: Could not find WebsiteBucketName in stack outputs.")
         sys.exit(1)
-
-    click.echo(f"  Bucket: {bucket_name}")
-    click.echo(f"  API URL: {api_url}")
-    click.echo(f"  CloudFront ID: {distribution_id}")
-    click.echo(f"  Website URL: {website_url}")
 
     # Update Configuration
     data['options']['s3_bucket'] = bucket_name
@@ -489,16 +498,6 @@ def perform_site_deploy(env, config_file, stack_name):
     # Invalidate CloudFront
     if distribution_id:
         invalidate_cloudfront(data, distribution_id)
-
-    # Run API Tests
-    if api_url:
-        if 'api_endpoints' in data:
-            updated_endpoints = []
-            for endpoint in data['api_endpoints']:
-                updated_endpoints.append(endpoint.replace('REPLACE_WITH_SAM_OUTPUT_API_URL', api_url))
-            custom_test_api_endpoints(updated_endpoints)
-        else:
-             click.echo("No api_endpoints defined in config, skipping tests.")
 
 def custom_test_api_endpoints(endpoints):
     """Tests a list of API endpoints handling POST-only routes."""
@@ -527,6 +526,25 @@ def custom_test_api_endpoints(endpoints):
         # but you could if you want strict failure.
     else:
         print("\nAll API endpoint tests passed.")
+
+def print_sam_outputs(stack_name, options):
+    """Prints the CloudFormation stack outputs using SAM CLI."""
+    click.echo("\n=== Stack Outputs ===")
+
+    cmd = ['sam', 'list', 'stack-outputs', '--stack-name', stack_name, '--output', 'table']
+
+    # Add region if specified in config, otherwise default to us-east-1
+    region = options.get('aws_region_name', 'us-east-1')
+    cmd.extend(['--region', region])
+
+    # Add profile if specified in config
+    if 'aws_profile_name' in options:
+        cmd.extend(['--profile', options['aws_profile_name']])
+
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError:
+        click.echo("Failed to retrieve stack outputs via SAM CLI.")
 
 def get_env_details(env):
     if env == 'dev':
@@ -606,6 +624,7 @@ def deploy_infra(env):
     # Load config to get profile
     data = load_config(config_file if os.path.exists(config_file) else 'data.yaml')
     perform_sam_deploy(env, stack_name, data)
+    print_sam_outputs(stack_name, data['options'])
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
@@ -620,7 +639,9 @@ def deploy_site(env):
             click.echo(f"Config file for {env} not found.")
             return
 
+    data = load_config(config_file) # Need data for options
     perform_site_deploy(env, config_file, stack_name)
+    print_sam_outputs(stack_name, data['options'])
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
@@ -648,12 +669,14 @@ def deploy_all(env):
             click.echo("Warning: shared_stack_name not found, skipping shared deploy.")
 
     # 2. SAM Deploy
-    if click.confirm('Deploy Infrastructure (SAM)?', default=True):
+    if click.confirm('Deploy Infrastructure (SAM)?', default=False):
         perform_sam_deploy(env, stack_name, data)
 
     # 3. Site Deploy (Build/Upload/Invalidate/Test)
     if click.confirm('Build and Upload Site?', default=True):
          perform_site_deploy(env, config_file, stack_name)
+
+    print_sam_outputs(stack_name, data['options'])
 
 # Alias for backward compatibility / ease of use
 cli.add_command(deploy_all, name='deploy')
