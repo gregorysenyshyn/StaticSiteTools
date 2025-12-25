@@ -262,6 +262,11 @@ def upload_to_s3(data):
         # Calculate destination key
         destname = filename[len(dist_dir)+1:]
 
+        # Skip images directory as it's handled by shared assets stack
+        if destname.startswith('images/'):
+            print(f"Skipping image: {destname}")
+            continue
+
         # Strip .html extension for clean URLs on S3/CloudFront
         if destname.endswith('.html'):
             destname = destname[:-5]
