@@ -391,7 +391,10 @@ def perform_sam_deploy(env, stack_name, data):
         # Construct the overrides list
         overrides_list = []
         for key, value in combined_overrides.items():
-            overrides_list.append(f"{key}={value}")
+            # Skip empty values to avoid "invalid format" errors in SAM CLI
+            # The template defaults should handle empty values if needed.
+            if value is not None and value != "":
+                 overrides_list.append(f"{key}={value}")
 
         # Debug output
         click.echo(f"Passing overrides: {overrides_list}")
