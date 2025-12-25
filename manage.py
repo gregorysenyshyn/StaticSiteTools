@@ -669,12 +669,14 @@ def deploy_all(env):
             click.echo("Warning: shared_stack_name not found, skipping shared deploy.")
 
     # 2. SAM Deploy
-    if click.confirm('Deploy Infrastructure (SAM)?', default=True):
+    if click.confirm('Deploy Infrastructure (SAM)?', default=False):
         perform_sam_deploy(env, stack_name, data)
 
     # 3. Site Deploy (Build/Upload/Invalidate/Test)
     if click.confirm('Build and Upload Site?', default=True):
          perform_site_deploy(env, config_file, stack_name)
+
+    print_sam_outputs(stack_name, data['options'])
 
 # Alias for backward compatibility / ease of use
 cli.add_command(deploy_all, name='deploy')
