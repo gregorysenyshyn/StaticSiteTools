@@ -211,10 +211,6 @@ def build_site(data):
     if 'test_forms' in data:
         tools.generate_test_pages(data, data['options'])
 
-    print('\n\n=== I M A G E S ===')
-    if 'images' in data['options']:
-        tools.handle_images(data['options'])
-
     print('\n\n=== A U D I O ===')
     if 'audio' in data['options']:
         tools.handle_audio(data['options'])
@@ -289,11 +285,6 @@ def upload_to_s3(data):
 
         # Calculate destination key
         destname = filename[len(dist_dir)+1:]
-
-        # Skip images directory as it's handled by shared assets stack
-        if destname.startswith('images/'):
-            print(f"Skipping image: {destname}")
-            continue
 
         # Strip .html extension for clean URLs on S3/CloudFront
         if destname.endswith('.html'):

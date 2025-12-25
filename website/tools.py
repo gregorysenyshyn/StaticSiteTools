@@ -177,20 +177,6 @@ def handle_scss(data, dest_path):
         f.write(sass.compile(string=scss_string))
     print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
 
-# ######## #
-#  IMAGES  #
-# ######## #
-
-
-def handle_images(options):
-    local_images = os.path.join(os.getcwd(),
-                                options['images'])
-    image_dest = options['dist']
-    print((f'linking {local_images} to {image_dest}...'), end='')
-    subprocess.run(['ln', '-s', local_images, image_dest])
-    print(' Done!')
-
-
 # ######### #
 #   AUDIO   #
 # ######### #
