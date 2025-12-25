@@ -13,7 +13,6 @@ import requests
 
 # Ensure we can import from local modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'repos', 'SST'))
 from shared import utils
 from shared.client import get_client
 from website import tools
@@ -152,33 +151,6 @@ def check_stack_status(stack_name, options):
         click.echo("Stack does not exist (clean state).")
         pass
 
-def get_certificate_arn(domain_name, options):
-    """
-    Finds an issued ACM certificate for the given domain.
-    Returns the ARN of the first matching certificate, or None if not found.
-    """
-    click.echo(f"Searching for ACM Certificate for {domain_name}...")
-    client = get_client('acm', options)
-
-    try:
-        # List certificates (pagination might be needed if you have many, but usually fits in one page)
-        response = client.list_certificates(CertificateStatuses=['ISSUED'])
-
-        for cert in response.get('CertificateSummaryList', []):
-            if cert['DomainName'] == domain_name:
-                click.echo(f"  Found certificate: {cert['CertificateArn']}")
-                return cert['CertificateArn']
-
-            # Also check Subject Alternative Names if needed (requires DescribeCertificate)
-            # For now, we assume the primary domain matches.
-
-        click.echo(f"  Warning: No issued certificate found for {domain_name}.")
-        return None
-
-    except client.exceptions.ClientError as e:
-        click.echo(f"  Error listing certificates: {e}")
-        return None
-
 def build_site(data):
     """Builds the static website using website.tools."""
     print('\nStarting build!')
@@ -210,6 +182,12 @@ def build_site(data):
     print('\n\n=== T E S T   P A G E S ===')
     if 'test_forms' in data:
         tools.generate_test_pages(data, data['options'])
+
+    print('\n\n=== I M A G E S ===')
+    if 'images' in data['options']:
+        tools.handle_images(data['options'])
+        # Automatically sync images to S3 during build
+        perform_image_sync(data)
 
     print('\n\n=== A U D I O ===')
     if 'audio' in data['options']:
@@ -317,50 +295,40 @@ def invalidate_cloudfront(data, distribution_id):
     waiter.wait(DistributionId=distribution_id, Id=response['Invalidation']['Id'])
     print("Done!")
 
-def display_sam_outputs(stack_name, options):
-    """
-    Runs 'sam list stack-outputs' to display a nice table of outputs.
-    This is intended as a convenient final summary for the user.
-    """
-    click.echo("\nRetrieving SAM Stack Outputs...")
-    cmd = ['sam', 'list', 'stack-outputs', '--stack-name', stack_name, '--output', 'table']
-
-    # Add region if specified
-    if 'aws_region_name' in options:
-        cmd.extend(['--region', options['aws_region_name']])
-
-    # Add profile if specified
-    if 'aws_profile_name' in options:
-        cmd.extend(['--profile', options['aws_profile_name']])
-
-    try:
-        # We use check=False because this is a convenience step.
-        # If 'sam' isn't installed or fails, we don't want to crash the whole script.
-        subprocess.run(cmd, check=False)
-    except FileNotFoundError:
-        click.echo("Warning: 'sam' command not found. Cannot list stack outputs.")
-    except Exception as e:
-        click.echo(f"Warning: Failed to list stack outputs: {e}")
-
 # --- Core Deployment Logic Helpers ---
 
-def run_api_tests_from_stack(stack_name, data):
-    """Fetches API URL from stack outputs and runs configured tests."""
-    click.echo("\nVerifying API Endpoints...")
-    region = data['options'].get('aws_region_name', 'us-east-1')
-    outputs = get_stack_outputs(stack_name, region, data['options'])
-    api_url = outputs.get('ApiUrl')
+def perform_image_sync(data):
+    """Syncs local images to the shared assets bucket."""
+    # Get shared stack name
+    shared_stack = data.get('parameters', {}).get('shared_stack_name') or data.get('shared_stack_name')
+    if not shared_stack:
+        print("Warning: shared_stack_name not found in config. Skipping image sync.")
+        return
 
-    if api_url:
-        if 'api_endpoints' in data:
-            updated_endpoints = []
-            for endpoint in data['api_endpoints']:
-                updated_endpoints.append(endpoint.replace('REPLACE_WITH_SAM_OUTPUT_API_URL', api_url))
-            custom_test_api_endpoints(updated_endpoints)
-        else:
-             click.echo("No api_endpoints defined in config, skipping tests.")
-    else:
-        click.echo("Warning: ApiUrl not found in stack outputs. Skipping API tests.")
+    # Get Bucket Name
+    region = data['options'].get('aws_region_name', 'us-east-1')
+    outputs = get_stack_outputs(shared_stack, region, data['options'])
+    bucket_name = outputs.get('AssetsBucketName')
+
+    if not bucket_name:
+        print("Warning: Could not fetch AssetsBucketName from stack outputs. Defaulting to 'asyncacademy-assets'.")
+        bucket_name = 'asyncacademy-assets'
+
+    print(f"Syncing images to {bucket_name}...")
+
+    cmd = ['aws', 's3', 'sync', 'images/', f's3://{bucket_name}']
+
+    if 'aws_profile_name' in data['options']:
+        cmd.extend(['--profile', data['options']['aws_profile_name']])
+
+    try:
+        subprocess.check_call(cmd)
+        print("Sync complete.")
+    except subprocess.CalledProcessError:
+        print("Sync failed. Ensure AWS CLI is installed and configured.")
+        # We don't exit here so the build can continue if offline
+    except FileNotFoundError:
+        print("Warning: 'aws' command not found. Skipping image sync.")
 
 def perform_shared_deploy(env, stack_name, data):
     """Executes SAM deploy for the shared infrastructure stack."""
@@ -376,7 +344,8 @@ def perform_shared_deploy(env, stack_name, data):
         '--template-file', 'template-shared.yaml',
         '--stack-name', stack_name,
         '--resolve-s3',
-        '--capabilities', 'CAPABILITY_IAM'
+        '--capabilities', 'CAPABILITY_IAM',
+        '--no-fail-on-empty-changeset'
     ]
 
     # Add parameters
@@ -444,7 +413,8 @@ def perform_sam_deploy(env, stack_name, data):
         '--stack-name', stack_name,
         '--parameter-overrides', f'Environment={env}',
         '--resolve-s3', # Let SAM manage the deployment bucket
-        '--capabilities', 'CAPABILITY_IAM'
+        '--capabilities', 'CAPABILITY_IAM',
+        '--no-fail-on-empty-changeset'
     ]
 
     # Combine config parameters and secret overrides
@@ -453,19 +423,6 @@ def perform_sam_deploy(env, stack_name, data):
     if 'parameters' in data and data['parameters']:
         combined_overrides.update(data['parameters'])
     combined_overrides.update(secret_overrides)
-
-    # Logic for Dynamic Certificate Lookup
-    # If DomainName is set, but CertificateArn is missing or AUTO, try to find it.
-    domain_name = combined_overrides.get('DomainName')
-    cert_arn = combined_overrides.get('CertificateArn')
-
-    if domain_name and (not cert_arn or cert_arn == 'AUTO'):
-        found_arn = get_certificate_arn(domain_name, data['options'])
-        if found_arn:
-            combined_overrides['CertificateArn'] = found_arn
-        elif cert_arn == 'AUTO':
-             click.echo("Error: CertificateArn set to AUTO but no certificate found.")
-             sys.exit(1)
 
     if combined_overrides:
         # Construct the overrides list
@@ -497,8 +454,6 @@ def perform_sam_deploy(env, stack_name, data):
     except subprocess.CalledProcessError:
         click.echo("SAM Deploy failed.")
         sys.exit(1)
-
-    run_api_tests_from_stack(stack_name, data)
 
 def perform_site_deploy(env, config_file, stack_name):
     """Fetches outputs, builds site, uploads, invalidates, and tests."""
@@ -535,6 +490,16 @@ def perform_site_deploy(env, config_file, stack_name):
     # Invalidate CloudFront
     if distribution_id:
         invalidate_cloudfront(data, distribution_id)
+
+    # Run API Tests
+    if api_url:
+        if 'api_endpoints' in data:
+            updated_endpoints = []
+            for endpoint in data['api_endpoints']:
+                updated_endpoints.append(endpoint.replace('REPLACE_WITH_SAM_OUTPUT_API_URL', api_url))
+            custom_test_api_endpoints(updated_endpoints)
+        else:
+             click.echo("No api_endpoints defined in config, skipping tests.")
 
 def custom_test_api_endpoints(endpoints):
     """Tests a list of API endpoints handling POST-only routes."""
@@ -591,6 +556,22 @@ def build_local(config):
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
+def sync_images(env):
+    """Syncs local images/ directory to the shared assets bucket."""
+    config_file, _ = get_env_details(env)
+
+    if not os.path.exists(config_file):
+        if os.path.exists('data.yaml'):
+            config_file = 'data.yaml'
+        else:
+            click.echo(f"Config file for {env} not found.")
+            return
+
+    data = load_config(config_file)
+    perform_image_sync(data)
+
+@cli.command()
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
 def deploy_shared(env):
     """Deploys ONLY the SHARED assets infrastructure."""
     config_file, _ = get_env_details(env) # we just need config file to load params
@@ -626,7 +607,6 @@ def deploy_infra(env):
     # Load config to get profile
     data = load_config(config_file if os.path.exists(config_file) else 'data.yaml')
     perform_sam_deploy(env, stack_name, data)
-    display_sam_outputs(stack_name, data['options'])
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
@@ -641,10 +621,7 @@ def deploy_site(env):
             click.echo(f"Config file for {env} not found.")
             return
 
-    # Load config to pass options to display_sam_outputs
-    data = load_config(config_file)
     perform_site_deploy(env, config_file, stack_name)
-    display_sam_outputs(stack_name, data['options'])
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
@@ -672,15 +649,12 @@ def deploy_all(env):
             click.echo("Warning: shared_stack_name not found, skipping shared deploy.")
 
     # 2. SAM Deploy
-    if click.confirm('Deploy Infrastructure (SAM)?', default=False):
+    if click.confirm('Deploy Infrastructure (SAM)?', default=True):
         perform_sam_deploy(env, stack_name, data)
 
     # 3. Site Deploy (Build/Upload/Invalidate/Test)
     if click.confirm('Build and Upload Site?', default=True):
          perform_site_deploy(env, config_file, stack_name)
-
-    # Final step: display stack outputs
-    display_sam_outputs(stack_name, data['options'])
 
 # Alias for backward compatibility / ease of use
 cli.add_command(deploy_all, name='deploy')
