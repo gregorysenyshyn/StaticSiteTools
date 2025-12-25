@@ -185,7 +185,6 @@ def build_site(data):
 
     print('\n\n=== I M A G E S ===')
     if 'images' in data['options']:
-        tools.handle_images(data['options'])
         # Automatically sync images to S3 during build
         perform_image_sync(data)
 
