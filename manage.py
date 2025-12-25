@@ -326,6 +326,31 @@ def invalidate_cloudfront(data, distribution_id):
     waiter.wait(DistributionId=distribution_id, Id=response['Invalidation']['Id'])
     print("Done!")
 
+def display_sam_outputs(stack_name, options):
+    """
+    Runs 'sam list stack-outputs' to display a nice table of outputs.
+    This is intended as a convenient final summary for the user.
+    """
+    click.echo("\nRetrieving SAM Stack Outputs...")
+    cmd = ['sam', 'list', 'stack-outputs', '--stack-name', stack_name, '--output', 'table']
+
+    # Add region if specified
+    if 'aws_region_name' in options:
+        cmd.extend(['--region', options['aws_region_name']])
+
+    # Add profile if specified
+    if 'aws_profile_name' in options:
+        cmd.extend(['--profile', options['aws_profile_name']])
+
+    try:
+        # We use check=False because this is a convenience step.
+        # If 'sam' isn't installed or fails, we don't want to crash the whole script.
+        subprocess.run(cmd, check=False)
+    except FileNotFoundError:
+        click.echo("Warning: 'sam' command not found. Cannot list stack outputs.")
+    except Exception as e:
+        click.echo(f"Warning: Failed to list stack outputs: {e}")
+
 # --- Core Deployment Logic Helpers ---
 
 def run_api_tests_from_stack(stack_name, data):
@@ -610,6 +635,7 @@ def deploy_infra(env):
     # Load config to get profile
     data = load_config(config_file if os.path.exists(config_file) else 'data.yaml')
     perform_sam_deploy(env, stack_name, data)
+    display_sam_outputs(stack_name, data['options'])
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
@@ -624,7 +650,10 @@ def deploy_site(env):
             click.echo(f"Config file for {env} not found.")
             return
 
+    # Load config to pass options to display_sam_outputs
+    data = load_config(config_file)
     perform_site_deploy(env, config_file, stack_name)
+    display_sam_outputs(stack_name, data['options'])
 
 @cli.command()
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
@@ -658,6 +687,9 @@ def deploy_all(env):
     # 3. Site Deploy (Build/Upload/Invalidate/Test)
     if click.confirm('Build and Upload Site?', default=True):
          perform_site_deploy(env, config_file, stack_name)
+
+    # Final step: display stack outputs
+    display_sam_outputs(stack_name, data['options'])
 
 # Alias for backward compatibility / ease of use
 cli.add_command(deploy_all, name='deploy')
