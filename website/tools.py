@@ -459,6 +459,7 @@ def generate_test_pages(data, options):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test: {form_name}</title>
+    <script src="https://www.google.com/recaptcha/enterprise.js?render={context['recaptcha_sitekey']}" async defer></script>
     {css_links}
     {js_links}
     <style>
@@ -491,7 +492,8 @@ def generate_test_pages(data, options):
     index_path = os.path.join(dist_test_dir, 'index.html')
     index_list_items = ""
     for page in generated_pages:
-        index_list_items += f'<li><a href="{page["file"]}">{page["name"]}</a></li>\n'
+        link = page["file"].replace(".html", "")
+        index_list_items += f'<li><a href="{link}">{page["name"]}</a></li>\n'
 
     index_content = f"""
 <!DOCTYPE html>
