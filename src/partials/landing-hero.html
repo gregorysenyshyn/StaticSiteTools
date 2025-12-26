@@ -1,0 +1,18 @@
+<section class="landing-hero">
+    <div class="hero-content">
+        <h1>{{ hero_title }}</h1>
+        <p>{{ hero_subtitle }}</p>
+        <a href="{{ hero_cta_link | default('#get-started') }}" class="btn-primary" style="display:inline-block; text-align:center; text-decoration:none; padding: 1rem 2rem; font-weight: 800; border: 3px solid #284B99; box-shadow: 4px 4px 0px #284B99; background: #FF9869; color: #284B99;" data-track-cta="hero">{{ hero_cta | default("START TODAY") }}</a>
+    </div>
+    <div class="hero-visual">
+        {% if hero_image %}
+        <img src="{{ images_url }}/{{ hero_image }}" alt="{{ hero_image_alt | default('Student Success') }}" style="max-width: 100%; height: auto; border: 3px solid #284B99; box-shadow: 4px 4px 0px #284B99;">
+        {% else %}
+        <!-- Placeholder for Hero Image -->
+        <div style="text-align:center;">
+            <p>{{ hero_image_alt | default("STUDENT SUCCESS IMAGE") }}</p>
+            <small>(Ministry Inspected BSID: 665288)</small>
+        </div>
+        {% endif %}
+    </div>
+</section>

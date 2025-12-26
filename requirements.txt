@@ -1,3 +1,4 @@
+# Core Build/Deploy Dependencies (from manage.py)
 click
 boto3
 PyYAML
@@ -6,3 +7,8 @@ libsass
 mistune
 python-frontmatter
 watchdog
+
+# Backend Lambda Dependencies
+urllib3
+stripe
+requests

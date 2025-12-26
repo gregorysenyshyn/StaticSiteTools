@@ -1,0 +1,99 @@
+{% extends 'layout.html' %}
+
+{% block title %}<title>{{ title }}</title>{% endblock %}
+
+{% block css %}
+<style>
+/* Critical CSS Inline */
+body { margin: 0; font-family: 'Inter', sans-serif; }
+.landing-header { display: flex; justify-content: space-between; padding: 1rem 2rem; border-bottom: 3px solid #FF9869; }
+.landing-hero { padding: 4rem 2rem; background: #DAE9F6; display: grid; gap: 2rem; }
+/* Ensure the markdown content is styled legibly */
+.landing-prose { max-width: 800px; margin: 0 auto; padding: 2rem; font-size: 1.1rem; line-height: 1.6; }
+.landing-prose h2 { margin-top: 2rem; }
+.landing-prose ul { padding-left: 1.5rem; }
+</style>
+<link rel="stylesheet" href="/css/landing.css">
+{% endblock css %}
+
+{% block core_js %}
+<script src="/js/landing.js" defer></script>
+{% endblock core_js %}
+
+{% block header %}
+{% include 'landing-header.html' %}
+{% endblock header %}
+
+{% block content %}
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "EducationalOrganization",
+  "name": "Asynchronous Academy",
+  "url": "https://asyncacademy.ca",
+  "logo": "{{ images_url }}/logo.webp",
+  "sameAs": [
+    "https://www.instagram.com/asyncacademy/",
+    "https://www.facebook.com/profile.php?id=61552145979861"
+  ]
+}
+</script>
+
+<main class="landing-main" id="main-content">
+
+    <!-- Hero Section -->
+    {% if hero_title %}
+        {% include 'landing-hero.html' %}
+    {% endif %}
+
+    <!-- Trust Signals -->
+    {% if trust_signals %}
+        {% include 'landing-trust.html' %}
+    {% endif %}
+
+    <!-- Main Markdown Content -->
+    {% block landing_body %}
+    {% if content %}
+    <article class="landing-prose">
+        {{ content | markdown }}
+    </article>
+    {% endif %}
+    {% endblock landing_body %}
+
+    <!-- Who This Is For -->
+    {% if features %}
+        {% include 'landing-features.html' %}
+    {% endif %}
+
+    <!-- How It Works -->
+    {% if steps %}
+        {% include 'landing-steps.html' %}
+    {% endif %}
+
+    <!-- Courses -->
+    {% if show_courses %}
+        {% include 'landing-courses.html' %}
+    {% endif %}
+
+    <!-- FAQ -->
+    {% if faqs %}
+        {% include 'landing-faq.html' %}
+    {% endif %}
+
+    <!-- Lead Form -->
+    {% block lead_form %}
+    {% include 'landing-form.html' %}
+    {% endblock lead_form %}
+
+</main>
+
+<!-- Sticky Mobile CTA -->
+<div class="sticky-cta hidden">
+    <a href="#get-started" class="btn-sticky" data-track-cta="mobile-sticky">START NOW</a>
+</div>
+{% endblock content %}
+
+{% block footer %}
+{% include 'landing-footer.html' %}
+{% endblock footer %}

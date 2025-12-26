@@ -1,0 +1,37 @@
+Resources:
+  RegistrationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-Registration"
+      AttributeDefinitions:
+        - AttributeName: payment_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: payment_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  SubmitRegistrationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: . # Adjust based on where you put the code in the final repo structure
+      Handler: submit_registration.lambda_handler
+      Runtime: python3.9
+      Environment:
+        Variables:
+          REGISTRATION_TABLE: !Ref RegistrationTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RegistrationTable
+      Events:
+        SubmitRegistrationApi:
+          Type: Api
+          Properties:
+            Path: /register
+            Method: post
+            RestApiId: !Ref MyApi # Assuming MyApi is defined elsewhere in the main template
+
+Outputs:
+  RegistrationTableArn:
+    Description: "ARN of the Registration DynamoDB Table"
+    Value: !GetAtt RegistrationTable.Arn

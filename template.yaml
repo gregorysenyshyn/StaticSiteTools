@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  SAM Template for Ontario Literacy Lambda Functions and Website Infrastructure
+  SAM Template for Async Academy Website and Backend
 
 Parameters:
   Environment:
@@ -27,45 +27,43 @@ Parameters:
     Default: ""
     Description: (Optional) Route53 Hosted Zone ID. Required if DomainName is provided.
 
-  GoogleClientId:
+  # Secrets (NoEcho: true triggers manage.py to look in Secrets Manager)
+  StripeSecretKey:
     Type: String
-    Description: Google OAuth Client ID
+    Description: Stripe Secret Key for processing payments
     NoEcho: true
 
-  GoogleClientSecret:
+  StripeEventBusName:
     Type: String
-    Description: Google OAuth Client Secret
+    Description: Name of the Stripe Event Bus (Partner Event Source)
+    Default: "default"
+
+  GoogleRecaptchaKey:
+    Type: String
+    Description: Google Recaptcha Site Key (for verification)
     NoEcho: true
 
-  JwtSecret:
+  GoogleApiKey:
     Type: String
-    Description: Secret key for signing JWTs
+    Description: Google API Key for Recaptcha Enterprise
     NoEcho: true
 
-  OpenAiApiKey:
+  GoogleProjectId:
     Type: String
-    Description: API Key for OpenAI
-    NoEcho: true
+    Description: Google Project ID for Recaptcha Enterprise
 
-  SnsWebFormTopicArn:
+  VerifiedEmail:
     Type: String
-    Description: ARN of the SNS Topic for web forms
-    Default: "arn:aws:sns:us-east-1:532640115648:webForm"
+    Description: SES Verified Email Address for sending notifications
 
-  SnsEmailGregTopicArn:
+  SenderName:
     Type: String
-    Description: ARN of the SNS Topic for emailing Greg
-    Default: "arn:aws:sns:us-east-1:532640115648:email-greg"
+    Default: "Async Academy"
+    Description: Friendly name for the email sender (e.g. Async Academy)
 
-  SnsConversionTopicArn:
+  EmailArn:
     Type: String
-    Description: ARN of the SNS Topic for conversion analytics
-    Default: "arn:aws:sns:us-east-1:532640115648:conversionAnalytics"
-
-  PurchaseRedirectUrl:
-    Type: String
-    Description: URL to redirect to after purchase
-    Default: "https://asyncacademy.ca/landing/success"
+    Description: ARN of the SES Identity
 
 Globals:
   Function:
@@ -75,21 +73,46 @@ Globals:
       - arm64
     Environment:
       Variables:
-        # Pass environment info to Lambdas if needed
         ENV: !Ref Environment
-        FRONTEND_DOMAIN: !If [HasDomain, !Sub "https://${DomainName}", !Sub "https://${WebsiteCloudFrontDistribution.DomainName}"]
-        REDIRECT_URI: !Sub "https://${WebsiteApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/auth/google/callback"
-        GOOGLE_CLIENT_ID: !Ref GoogleClientId
-        GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-        JWT_SECRET: !Ref JwtSecret
-        OPENAI_API_KEY: !Ref OpenAiApiKey
-        SNS_WEB_FORM_TOPIC_ARN: !Ref SnsWebFormTopicArn
-        SNS_EMAIL_GREG_TOPIC_ARN: !Ref SnsEmailGregTopicArn
+        # Add common env vars here if needed
 
 Conditions:
   HasDomain: !Not [!Equals [!Ref DomainName, ""]]
+  IsProd: !Equals [!Ref Environment, "prod"]
 
 Resources:
+  # --------------------------------------------------------------------------
+  # AWS Budget (Production Only)
+  # --------------------------------------------------------------------------
+  MonthlyCostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: IsProd
+    Properties:
+      Budget:
+        BudgetName: !Sub "${AWS::StackName}-Monthly-Budget"
+        BudgetLimit:
+          Amount: 30
+          Unit: USD
+        TimeUnit: MONTHLY
+        BudgetType: COST
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 20
+            ThresholdType: ABSOLUTE_VALUE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: greg@gregorysenyshyn.com
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 30
+            ThresholdType: ABSOLUTE_VALUE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: greg@gregorysenyshyn.com
+
   # --------------------------------------------------------------------------
   # API Gateway
   # --------------------------------------------------------------------------
@@ -109,8 +132,6 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     Properties:
-      # If DomainName is provided, use it as the bucket name (legacy behavior for prod).
-      # Otherwise, let CloudFormation generate a unique name.
       BucketName: !If [HasDomain, !Ref DomainName, !Ref "AWS::NoValue"]
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -120,7 +141,6 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
 
-  # Origin Access Control (OAC) for CloudFront to access S3
   CloudFrontOriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
@@ -130,7 +150,6 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
-  # Bucket Policy to allow CloudFront OAC access
   WebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -146,22 +165,58 @@ Resources:
             Condition:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${WebsiteCloudFrontDistribution}"
-          - Effect: Allow
-            Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
-            Action: "s3:*"
-            Resource:
-              - !Sub "arn:aws:s3:::${WebsiteBucket}"
-              - !Sub "arn:aws:s3:::${WebsiteBucket}/*"
-          - Effect: Allow
-            Principal:
-              AWS:
-                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
-                - "arn:aws:iam::281625459120:root"
-            Action: "s3:*"
-            Resource:
-              - !Sub "arn:aws:s3:::${WebsiteBucket}"
-              - !Sub "arn:aws:s3:::${WebsiteBucket}/*"
+
+  # --------------------------------------------------------------------------
+  # CloudFront KeyValueStore and Function (Production Only)
+  # --------------------------------------------------------------------------
+  ABTestingStore:
+    Type: AWS::CloudFront::KeyValueStore
+    Condition: IsProd
+    Properties:
+      Name: !Sub "${AWS::StackName}-ABTestingStore"
+
+  ABTestingFunction:
+    Type: AWS::CloudFront::Function
+    Condition: IsProd
+    Properties:
+      Name: !Sub "${AWS::StackName}-ABTestingFunction"
+      FunctionCode: !Sub |
+        import cf from 'cloudfront';
+        import { createKvsHandle } from 'cloudfront-kv-store';
+        const kvsHandle = createKvsHandle();
+
+        async function handler(event) {
+          const request = event.request;
+          const uri = request.uri;
+          try {
+            const configStr = await kvsHandle.get(uri);
+            if (configStr) {
+              const config = JSON.parse(configStr);
+              if (config.variants && Array.isArray(config.variants)) {
+                const totalWeight = config.variants.reduce((sum, v) => sum + (v.weight || 0), 0);
+                let random = Math.random() * totalWeight;
+                for (const variant of config.variants) {
+                  random -= (variant.weight || 0);
+                  if (random <= 0) {
+                    if (variant.path) {
+                      request.uri = variant.path;
+                    }
+                    break;
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            // Key not found or error, proceed with original request
+          }
+          return request;
+        }
+      FunctionConfig:
+        Comment: "A/B Testing Function using KeyValueStore"
+        Runtime: cloudfront-js-2.0
+        KeyValueStoreAssociations:
+          - KeyValueStoreArn: !GetAtt ABTestingStore.Arn
+      AutoPublish: true
 
   # --------------------------------------------------------------------------
   # CloudFront Distribution
@@ -177,11 +232,7 @@ Resources:
             S3OriginConfig: {}
         Enabled: true
         DefaultRootObject: index
-
-        # Only set Aliases if a domain is provided
         Aliases: !If [HasDomain, [!Ref DomainName], !Ref "AWS::NoValue"]
-
-        # Use Custom Certificate if Domain is provided, else use Default CloudFront Cert
         ViewerCertificate:
           !If
           - HasDomain
@@ -189,26 +240,25 @@ Resources:
             SslSupportMethod: sni-only
             MinimumProtocolVersion: TLSv1.2_2021
           - CloudFrontDefaultCertificate: true
-
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods:
-            - GET
-            - HEAD
-            - OPTIONS
-          CachedMethods:
-            - GET
-            - HEAD
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
           ForwardedValues:
             QueryString: false
             Cookies:
               Forward: none
+          FunctionAssociations:
+            !If
+            - IsProd
+            - - EventType: viewer-request
+                FunctionARN: !GetAtt ABTestingFunction.FunctionARN
+            - !Ref "AWS::NoValue"
         HttpVersion: http2
-        PriceClass: PriceClass_100
 
   # --------------------------------------------------------------------------
-  # Route53 Record for the Domain (Only created if DomainName is provided)
+  # Route53 Record
   # --------------------------------------------------------------------------
   WebsiteDNSRecord:
     Type: AWS::Route53::RecordSet
@@ -218,79 +268,230 @@ Resources:
       Name: !Ref DomainName
       Type: A
       AliasTarget:
-        HostedZoneId: Z2FDTNDATAQYW2 # CloudFront's fixed Hosted Zone ID
+        HostedZoneId: Z2FDTNDATAQYW2
         DNSName: !GetAtt WebsiteCloudFrontDistribution.DomainName
+
+  # --------------------------------------------------------------------------
+  # DynamoDB Table for Registrations
+  # --------------------------------------------------------------------------
+  RegistrationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-Registration"
+      AttributeDefinitions:
+        - AttributeName: payment_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: payment_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # --------------------------------------------------------------------------
+  # DynamoDB Table for Leads
+  # --------------------------------------------------------------------------
+  LeadsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-Leads"
+      AttributeDefinitions:
+        - AttributeName: lead_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: lead_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # --------------------------------------------------------------------------
+  # Step Function for Lead Nurture
+  # --------------------------------------------------------------------------
+  LeadNurtureStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Definition:
+        StartAt: WaitFirstHour
+        States:
+          WaitFirstHour:
+            Type: Wait
+            SecondsPath: "$.wait_time"
+            Next: SendWelcomeEmail
+          SendWelcomeEmail:
+            Type: Task
+            Resource: !GetAtt SendNurtureEmailFunction.Arn
+            Parameters:
+              email.$: "$.email"
+              first_name.$: "$.first_name"
+              type: "welcome"
+            Next: WaitFollowUp
+          WaitFollowUp:
+            Type: Wait
+            Seconds: 259200 # 3 Days
+            Next: SendFollowUpEmail
+          SendFollowUpEmail:
+            Type: Task
+            Resource: !GetAtt SendNurtureEmailFunction.Arn
+            Parameters:
+              email.$: "$.email"
+              first_name.$: "$.first_name"
+              type: "followup"
+            End: true
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SendNurtureEmailFunction
 
   # --------------------------------------------------------------------------
   # Lambda Functions
   # --------------------------------------------------------------------------
-  OauthFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/aws/lambda/auth/
-      Handler: auth.lambda_handler
-      Events:
-        AuthProxy:
-          Type: Api
-          Properties:
-            RestApiId: !Ref WebsiteApi
-            Path: /auth/{proxy+}
-            Method: any
 
-  FormHandlerFunction:
+  # 1. Contact Form Handler
+  ContactFormFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/aws/lambda/formHandler/
-      Handler: form_handler.lambda_handler
-      Events:
-        FormEndpoint:
-          Type: Api
-          Properties:
-            RestApiId: !Ref WebsiteApi
-            Path: /form
-            Method: post
-
-  TestScoringFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/aws/lambda/scoring/
-      Handler: scoring.handler
-      Events:
-        ScoringEndpoint:
-          Type: Api
-          Properties:
-            RestApiId: !Ref WebsiteApi
-            Path: /scoring
-            Method: post
-
-  PurchaseRedirectFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/aws/lambda/purchaseRedirect/
-      Handler: purchase_redirect.lambda_handler
+      CodeUri: .
+      Handler: src.backend_snippets.contact_form.lambda_handler
+      Policies:
+        - SESCrudPolicy:
+            IdentityName: !Ref VerifiedEmail
       Environment:
         Variables:
-          SNS_CONVERSION_TOPIC_ARN: !Ref SnsConversionTopicArn
-          PURCHASE_REDIRECT_URL: !Ref PurchaseRedirectUrl
+          VERIFIED_EMAIL: !Ref VerifiedEmail
+          SENDER_NAME: !Ref SenderName
+          EMAIL_ARN: !Ref EmailArn
+          GOOGLE_RECAPTCHA_KEY: !Ref GoogleRecaptchaKey
+          GOOGLE_API_KEY: !Ref GoogleApiKey
+          GOOGLE_PROJECT_ID: !Ref GoogleProjectId
+      Events:
+        ContactEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /contact
+            Method: post
 
-  NewLeadFunction:
+  # 2. Stripe Payment Intent Creator
+  CreatePaymentIntentFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/aws/lambda/newLead/
-      Handler: new_lead.lambda_handler
+      CodeUri: .
+      Handler: src.backend_snippets.create_payment_intent.lambda_handler
+      Environment:
+        Variables:
+          STRIPE_SECRET_KEY: !Ref StripeSecretKey
       Events:
-        NewLeadTrigger:
-          Type: SNS
+        PaymentEndpoint:
+          Type: Api
           Properties:
-            Topic: !Ref SnsWebFormTopicArn
+            RestApiId: !Ref WebsiteApi
+            Path: /create-payment-intent
+            Method: post
+
+  # 3. Registration Submission Handler
+  SubmitRegistrationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.backend_snippets.submit_registration.lambda_handler
       Policies:
-        - Statement:
-            - Effect: Allow
-              Action: dynamodb:UpdateItem
-              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/leads"
-            - Effect: Allow
-              Action: sns:Publish
-              Resource: !Ref SnsEmailGregTopicArn
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RegistrationTable
+      Environment:
+        Variables:
+          REGISTRATION_TABLE: !Ref RegistrationTable
+      Events:
+        RegisterEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /register
+            Method: post
+
+  # 4. Lead Capture Handler
+  LeadCaptureFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.backend_snippets.lead_capture.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LeadsTable
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt LeadNurtureStateMachine.Name
+      Environment:
+        Variables:
+          LEADS_TABLE: !Ref LeadsTable
+          STATE_MACHINE_ARN: !Ref LeadNurtureStateMachine
+          WAIT_TIME: !If [IsProd, "3600", "60"]
+      Events:
+        LeadEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /lead
+            Method: post
+
+  # 5. Send Nurture Email Handler (Internal)
+  SendNurtureEmailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.backend_snippets.send_nurture_email.lambda_handler
+      Policies:
+        - SESCrudPolicy:
+            IdentityName: !Ref VerifiedEmail
+      Environment:
+        Variables:
+          VERIFIED_EMAIL: !Ref VerifiedEmail
+          EMAIL_ARN: !Ref EmailArn
+
+  # 6. Stripe Event Handler (EventBridge)
+  StripeEventHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.backend_snippets.stripe_event_handler.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RegistrationTable
+        - SESCrudPolicy:
+            IdentityName: !Ref VerifiedEmail
+      Environment:
+        Variables:
+          REGISTRATION_TABLE: !Ref RegistrationTable
+          SENDER_EMAIL: !Ref VerifiedEmail
+          SENDER_ARN: !Ref EmailArn
+          API_URL_FOR_EMAIL: !If [HasDomain, !Sub "https://${DomainName}", !Sub "https://${WebsiteCloudFrontDistribution.DomainName}"]
+      Events:
+        StripeEvent:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref StripeEventBusName
+            Pattern:
+              source:
+                - !Ref StripeEventBusName
+              detail-type:
+                - "Stripe Event"
+              detail:
+                type:
+                  - "payment_intent.succeeded"
+
+  # 7. Get Registration Details
+  GetRegistrationDetailsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.backend_snippets.get_registration_details.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref RegistrationTable
+      Environment:
+        Variables:
+          REGISTRATION_TABLE: !Ref RegistrationTable
+      Events:
+        GetDetailsEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /registration-details
+            Method: get
 
 Outputs:
   WebsiteBucketName:
@@ -305,3 +506,14 @@ Outputs:
   ApiUrl:
     Description: URL of the API Gateway
     Value: !Sub "https://${WebsiteApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+  RegistrationTableArn:
+    Description: ARN of the Registration DynamoDB Table
+    Value: !GetAtt RegistrationTable.Arn
+  ABTestingStoreId:
+    Description: Id of the AB Testing KeyValueStore
+    Condition: IsProd
+    Value: !Ref ABTestingStore
+  ABTestingStoreArn:
+    Description: ARN of the AB Testing KeyValueStore
+    Condition: IsProd
+    Value: !GetAtt ABTestingStore.Arn

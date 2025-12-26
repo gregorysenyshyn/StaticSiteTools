@@ -1,0 +1,135 @@
+// Neo-Brutalist Modal Styles
+#payment-modal {
+  display: none; // Hidden by default
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.4); // Black w/ opacity
+  backdrop-filter: blur(2px);
+
+  // Show state
+  &.show {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+}
+
+.neo-modal-content {
+  background-color: #fff;
+  margin: auto;
+  padding: 2rem;
+  border: 3px solid #000;
+  box-shadow: 6px 6px 0px #000; // Hard shadow
+  width: 90%;
+  max-width: 500px;
+  position: relative;
+  animation: modal-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  h2 {
+    font-weight: 900;
+    margin-bottom: 1.5rem;
+    font-size: 1.8rem;
+    text-transform: uppercase;
+    border-bottom: 3px solid #000;
+    padding-bottom: 0.5rem;
+  }
+}
+
+.neo-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  color: #aaa;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.2s;
+
+  &:hover,
+  &:focus {
+    color: #000;
+    text-decoration: none;
+  }
+}
+
+// Payment Element Container
+#payment-element {
+  margin-bottom: 1.5rem;
+  min-height: 200px; // Prevent collapse while loading
+}
+
+// Submit Button inside Modal
+#payment-submit {
+  width: 100%;
+  padding: 1rem;
+  background-color: #284B99; // Using site blue
+  color: #fff;
+  font-weight: 800;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.1s;
+
+  &:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0px #000;
+  }
+
+  &:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px #000;
+  }
+
+  &:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+#payment-message {
+  color: #e53e3e;
+  margin-top: 1rem;
+  font-weight: 700;
+  text-align: center;
+  display: none; // Hidden by default
+
+  &.success {
+      color: green;
+  }
+}
+
+// Spinner
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: #09f;
+  animation: spin 1s ease infinite;
+  margin: 0 auto;
+  display: none;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

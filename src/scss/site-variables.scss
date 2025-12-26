@@ -1,0 +1,413 @@
+$darkblue: #284B99;
+$medblue: #71A9F7;
+$medblue2: #00A7E1;
+$lightblue: lighten($medblue, 30%);
+$orange: #FF9869;
+$brown: #CC8272;
+$text: darken($orange, 60%);
+
+/* Neo-Brutalist Variables */
+$neo-shadow: 4px 4px 0px $text;
+$neo-shadow-hover: 6px 6px 0px $text;
+$neo-shadow-active: 2px 2px 0px $text;
+$neo-border: 3px solid $text;
+$neo-border-color: $text;
+
+
+@mixin sm {
+  @media screen and (max-width: 1000px) {
+    @content;
+  }
+}
+
+@mixin md {
+  @media screen and (min-width: 1000px) {
+    @content;
+  }
+}
+
+@mixin lg {
+  @media screen and (min-width: 1400px) {
+    @content;
+  }
+}
+
+@mixin xl {
+  @media screen and (min-width: 2000px) {
+    @content;
+  }
+}
+
+.grecaptcha-badge { visibility: hidden; }
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: Inter, sans-serif;
+  color: $text;
+}
+
+body {
+  margin: 0;
+  line-height: 1.6; /* Updated from 200% for better readability with brutalist style */
+}
+
+main {
+  @media screen {
+    @include sm {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    @include md {
+      display: grid;
+      grid-template-columns: 12.5% 12.5% 50% 12.5% 12.5%;
+      position: relative;
+    }
+  }
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: $darkblue;
+  text-align: center;
+  font-weight: 800; /* Neo-brutalist bold */
+  text-transform: uppercase; /* Neo-brutalist uppercase */
+  letter-spacing: -0.02em;
+}
+
+a {
+  text-decoration: none;
+  color: $darkblue; /* Updated to darkblue as base */
+  font-weight: 700;
+  &:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-decoration-color: $orange;
+  }
+}
+
+strong {
+  font-weight: 800;
+}
+
+form {
+  small {
+    margin-top: 1rem;
+  }
+}
+
+button, input[type="button"], input[type="submit"], .btn-neo {
+  background-color: $orange; /* Primary CTA Color */
+  color: $darkblue;
+  border: $neo-border;
+  font-size: 1.2rem;
+  font-weight: 800;
+  padding: 1rem;
+  border-radius: 0; /* Brutalist - no radius */
+  box-shadow: $neo-shadow;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+button:hover, input[type="button"]:hover, input[type="submit"]:hover, .btn-neo:hover {
+  transform: translate(-2px, -2px);
+  background-color: lighten($orange, 5%);
+  box-shadow: $neo-shadow-hover;
+}
+
+button:active, input[type="button"]:active, input[type="submit"]:active, .btn-neo:active   {
+  transform: translate(2px, 2px);
+  box-shadow: $neo-shadow-active;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Loader */
+
+.loader {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-block;
+  border-top: 4px solid #FFF;
+  border-right: 4px solid transparent;
+  box-sizing: border-box;
+  animation: rotation 1s linear infinite;
+}
+.loader::after {
+  content: '';
+  box-sizing: border-box;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border-bottom: 4px solid $orange;
+  border-left: 4px solid transparent;
+}
+@keyframes rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* End Loader */
+
+.youtube-video {
+  max-width: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  iframe {
+    width: 90%;
+    aspect-ratio: 16 / 9;
+    border: $neo-border;
+    box-shadow: $neo-shadow;
+  }
+}
+
+.orange-button {
+  background-color: $orange;
+  color: $darkblue;
+  border: $neo-border;
+}
+
+.orange-button:hover {
+  background-color: lighten($orange, 10%);
+}
+
+.orange-button:active {
+  background-color: $orange;
+  color: $darkblue;
+}
+
+.page-text-wrapper {
+  padding-bottom: 4rem;
+  @include sm {
+    padding: 2rem;
+    max-width: 100%;
+  }
+  @include md {
+    grid-column: 3;
+  }
+}
+
+#hero {
+  position: relative;
+  max-width: 100vw;
+  height: 90vh;
+  background-size: cover;
+  background-position: center;
+  color: white;
+  z-index: 5;
+  line-height: initial;
+  border-bottom: $neo-border; /* Added border */
+
+  display: flex;
+  @include sm {
+    align-items: flex-end;
+  }
+  @include md {
+    align-items: center;
+  }
+
+  #hero-text {
+    text-shadow: $neo-shadow; /* Updated shadow */
+
+    @include sm {
+      padding: 2rem;
+      font-size: 1.6rem;
+    }
+    @include md {
+      margin-left: 25%;
+      width: 50%;
+      font-size: 1.1rem;
+    }
+    @include lg {
+      width: 30%;
+    }
+    button {
+      /* Removed specific shadow, using default button style */
+      @include sm {
+        margin: 2rem 0;
+      }
+      @include md {
+        margin: 0;
+      }
+      @include lg {
+        margin: 2rem 0;
+      }
+    }
+  }
+
+  .hero-headline {
+    font-size: 3rem;
+    font-weight: 800;
+    color: $darkblue;
+    text-shadow: 2px 2px 0px white; /* Neo style */
+    @include md {
+      margin: 0;
+    }
+
+    .hero-callout {
+      color: $orange;
+      text-shadow: 2px 2px 0px $darkblue;
+    }
+  }
+
+  .hero-headline-white {
+    color: white !important;
+    text-shadow: 4px 4px 0px $darkblue !important;
+  }
+
+}
+
+.tile-wrapper {
+  grid-column: 1 / span 5;
+  display: flex;
+  @include sm {
+    flex-direction: column;
+  }
+
+  @include md {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+  }
+}
+
+/* Updated .tile to .neo-card style mostly, but keeping .tile name for compat */
+.tile {
+  position: relative;
+  aspect-ratio: 1/1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-size: cover;
+  background-color: white;
+  max-height: 100%;
+  border: $neo-border;
+  box-shadow: $neo-shadow;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: $neo-shadow-hover;
+  }
+
+  h2, p {
+    color: white;
+    text-shadow: 2px 2px 0px black;
+  }
+}
+
+.tile-floating-text-box {
+  position: absolute;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  text-align: center;
+  z-index: 3;
+  background-color: rgba(40, 75, 153, 0.85); /* Darker blue overlay */
+  color: white;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  border: 0; /* Inner shouldn't have border */
+
+  h3 {
+    font-size: 1.5rem;
+    color: white;
+  }
+
+  h2, h3, p, a {
+    color: white;
+    max-width: 85%;
+    text-shadow: none; /* Removed blur shadow for cleaner look or keep if needed */
+  }
+}
+
+.two-tile {
+  flex-basis: 40%;
+  @include sm {
+    flex-basis: 100%;
+  }
+}
+
+.three-tile {
+  flex-basis: 26%;
+  @include sm {
+    flex-basis: 100%;
+  }
+}
+
+.four-tile {
+  flex-basis: 20%;
+  @include sm {
+    flex-basis: 100%;
+  }
+}
+
+.tile-sm-1 {
+  @include sm {
+    order: 1;
+  }
+}
+
+.tile-sm-2 {
+  @include sm {
+    order: 2;
+  }
+}
+
+.tile-sm-3 {
+  @include sm {
+    order: 3;
+  }
+}
+
+.tile-sm-4 {
+  @include sm {
+    order: 4;
+  }
+}
+
+.tile-text-box {
+  height: 100%; /* Fill container */
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+  background: white; /* Ensure text is readable */
+  padding: 1rem;
+
+  h3 {
+    font-size: 1.5rem;
+    margin: 0.5rem;
+    color: $darkblue;
+  }
+
+  p {
+    color: $text !important;
+    text-shadow: none !important;
+  }
+
+  button {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+  }
+}

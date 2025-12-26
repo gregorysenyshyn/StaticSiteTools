@@ -32,8 +32,8 @@ parameters:
   SenderName: "CHANGE_ME_SENDER_NAME"
   EmailArn: "CHANGE_ME_EMAIL_ARN"
   GoogleProjectId: "CHANGE_ME_GOOGLE_PROJECT_ID"
-  DomainName: ""
-  CertificateArn: ""
+  DomainName: "CHANGE_ME_DOMAIN"
+  CertificateArn: "CHANGE_ME_CERTIFICATE_ARN"
   HostedZoneId: "CHANGE_ME_HOSTED_ZONE_ID"
 
 shared_stack_name: "CHANGE_ME_SHARED_STACK"

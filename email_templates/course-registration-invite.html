@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 3px solid #000; box-shadow: 6px 6px 0px #000; }
+        .header { background-color: #284B99; color: white; padding: 10px; text-align: center; font-weight: bold; }
+        .content { padding: 20px; }
+        .button { display: inline-block; background-color: #71A9F7; color: #000; padding: 10px 20px; text-decoration: none; border: 2px solid #000; box-shadow: 4px 4px 0px #000; font-weight: bold; margin-top: 20px; }
+        .button:hover { background-color: #5a95e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            Async Academy Registration
+        </div>
+        <div class="content">
+            <p>Hi {{name}},</p>
+            <p>Thank you for your payment! We're excited to have you join us for <strong>{{course_name}}</strong>.</p>
+            <p>To finalize your enrollment, please complete the registration form by clicking the button below:</p>
+            <a href="{{registration_link}}" class="button">Complete Registration</a>
+            <p>If you have any questions, please reply to this email.</p>
+            <p>Thanks,<br>The Async Academy Team</p>
+        </div>
+    </div>
+</body>
+</html>
