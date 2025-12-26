@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Bootstrap template to create a secure Admin user and group.
+  Deploys an Administrators group and a dedicated AdminUser.
+
+Resources:
+  # --------------------------------------------------------------------------
+  # IAM Group for Administrators
+  # --------------------------------------------------------------------------
+  AdministratorsGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: Administrators
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  # --------------------------------------------------------------------------
+  # Admin User
+  # --------------------------------------------------------------------------
+  AdminUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: admin
+      Groups:
+        - !Ref AdministratorsGroup
+
+Outputs:
+  AdminUserName:
+    Description: The name of the created Admin user
+    Value: !Ref AdminUser
+  LoginUrl:
+    Description: URL to login to the AWS Console
+    Value: !Sub "https://${AWS::AccountId}.signin.aws.amazon.com/console"

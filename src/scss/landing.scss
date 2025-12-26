@@ -1,0 +1,253 @@
+/* Neo-Brutalist Variables (Local Overrides/Additions) */
+$neo-shadow: 4px 4px 0px $text;
+$neo-shadow-hover: 6px 6px 0px $text;
+$neo-shadow-active: 2px 2px 0px $text;
+$neo-border: 3px solid $text;
+$neo-border-color: $text;
+
+/* Base Reset/Overrides */
+body {
+  font-family: 'Inter', sans-serif;
+  color: $text;
+}
+
+/* Reset Main Layout for Landing Page */
+main.landing-main {
+  display: block !important;
+  max-width: 100vw;
+  width: 100%;
+
+  @include md {
+    display: block !important;
+  }
+}
+
+h1, h2, h3, h4 {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Skip Link */
+.skip-link {
+  position: absolute;
+  top: -9999px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: $orange;
+  color: $darkblue;
+  padding: 1rem;
+  z-index: 1000;
+  text-decoration: none;
+  font-weight: 800;
+  border: $neo-border;
+  box-shadow: $neo-shadow;
+
+  &:focus {
+    top: 0;
+  }
+}
+
+/* Header */
+.landing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-bottom: $neo-border;
+  background: white;
+
+  .logo {
+    font-weight: 900;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    color: $darkblue;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    img {
+      height: 40px;
+    }
+  }
+
+  nav {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+
+    a {
+      color: $text;
+      font-weight: 700;
+      text-decoration: none;
+      &:hover {
+        text-decoration: underline;
+        text-decoration-thickness: 3px;
+      }
+    }
+
+    .nav-courses {
+        @include sm {
+            display: none;
+        }
+    }
+
+    .phone-link {
+        color: $darkblue;
+        font-weight: 800;
+        @include sm {
+            display: none;
+        }
+    }
+  }
+}
+
+/* Hero Section */
+.landing-hero {
+  padding: 4rem 2rem;
+  background-color: $lightblue; /* Fallback */
+  border-bottom: $neo-border;
+  display: grid;
+  gap: 2rem;
+
+  @include md {
+    grid-template-columns: 1fr 1fr;
+    padding: 6rem 4rem;
+  }
+
+  .hero-content {
+    h1 {
+      font-size: 2.5rem;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      color: $darkblue;
+      text-shadow: 2px 2px 0px white;
+
+      @include md {
+        font-size: 3.5rem;
+      }
+    }
+
+    p {
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+      max-width: 50ch;
+    }
+  }
+
+  .hero-visual {
+    background: white;
+    border: $neo-border;
+    box-shadow: $neo-shadow;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: $medblue;
+    text-transform: uppercase;
+  }
+}
+
+
+/* How It Works */
+.how-works {
+  padding: 4rem 2rem;
+  background: $lightblue;
+  border-bottom: $neo-border;
+
+  h2 {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .steps-grid {
+    display: grid;
+    gap: 2rem;
+    max-width: 1000px;
+    margin: 0 auto;
+
+    @include md {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .step {
+      text-align: center;
+
+      .step-num {
+        display: inline-block;
+        width: 50px;
+        height: 50px;
+        background: $darkblue;
+        color: white;
+        border-radius: 50%;
+        font-size: 1.5rem;
+        font-weight: 800;
+        line-height: 50px;
+        margin-bottom: 1rem;
+        box-shadow: 4px 4px 0px $text;
+      }
+
+      h3 {
+        margin-bottom: 0.5rem;
+      }
+    }
+  }
+}
+
+/* Sticky Mobile CTA */
+.sticky-cta {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 1rem;
+    background: white;
+    border-top: $neo-border;
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+    z-index: 100;
+    display: none; /* JS will toggle */
+
+    @include md {
+        display: none !important;
+    }
+
+    a.btn-sticky {
+        display: block;
+        width: 100%;
+        text-align: center;
+        background: $orange;
+        color: $darkblue;
+        font-weight: 800;
+        padding: 1rem;
+        border: $neo-border;
+        text-decoration: none;
+        box-shadow: $neo-shadow;
+
+        &:active {
+            transform: translate(2px, 2px);
+            box-shadow: $neo-shadow-active;
+        }
+    }
+}
+
+/* Footer */
+.landing-footer {
+    padding: 2rem;
+    background: $darkblue;
+    color: white;
+    text-align: center;
+
+    a {
+        color: $medblue;
+        text-decoration: underline;
+    }
+
+    p {
+        margin: 0.5rem 0;
+    }
+}

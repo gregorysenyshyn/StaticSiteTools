@@ -1,0 +1,86 @@
+<section class="lead-form-section two-col-form" id="callback-form-wrapper">
+    <div class="form-container">
+        <h2>Want to Talk to Someone?</h2>
+        <p>Fill out the form below to speak with an enrollment advisor.</p>
+
+        <form id="lead-form" novalidate data-track-form="lead-submit" data-api-url="{{ api_url }}" data-recaptcha-sitekey="{{ recaptcha_sitekey }}">
+            <!-- First Name and Last Name separate for 2-col, but in mobile they stack.
+                 The .two-col-form grid makes ALL direct children grid items.
+                 Since form-group-row is a child, it will take one cell (or we can expand it).
+                 However, better to break them out of form-group-row if we want them to flow naturally in the grid.
+                 If I keep form-group-row, it might mess with the grid flow or need to span 2 cols.
+                 Let's remove form-group-row and let them be individual grid items.
+            -->
+            <div class="form-group">
+                <label for="first_name">First Name *</label>
+                <input type="text" id="first_name" name="first_name" required placeholder="Jane">
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+            <div class="form-group">
+                <label for="last_name">Last Name *</label>
+                <input type="text" id="last_name" name="last_name" required placeholder="Doe">
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="role">I am a... *</label>
+                <select id="role" name="role" required>
+                    <option value="">Select Role...</option>
+                    <option value="parent">Parent / Guardian</option>
+                    <option value="student">Student</option>
+                </select>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" name="email" required placeholder="jane@example.com">
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number (Optional)</label>
+                <input type="tel" id="phone" name="phone" placeholder="(613) 212-5989">
+            </div>
+
+            <div class="form-group">
+                <label for="grade">Current Grade *</label>
+                <select id="grade" name="grade" required>
+                    <option value="">Select Grade...</option>
+                    <option value="8">Grade 8</option>
+                    <option value="9">Grade 9</option>
+                    <option value="10">Grade 10</option>
+                    <option value="11">Grade 11</option>
+                    <option value="12">Grade 12</option>
+                    <option value="adult">Adult Learner</option>
+                </select>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group full-width">
+                <label for="goal">Primary Goal *</label>
+                <select id="goal" name="goal" required>
+                    <option value="">Select Goal...</option>
+                    <option value="university">University Acceptance</option>
+                    <option value="college">College Acceptance</option>
+                    <option value="catchup">Catch Up / Credit Recovery</option>
+                    <option value="flexibility">Flexible Schedule</option>
+                    <option value="other">Other</option>
+                </select>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="checkbox-group full-width">
+                <input type="checkbox" id="consent" name="consent" required>
+                <label for="consent">I consent to be contacted by Asynchronous Academy regarding educational programs.</label>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+             <div class="form-group full-width">
+                 <div class="error-msg" aria-live="polite"></div>
+             </div>
+
+            <button type="submit" class="btn-primary full-width" data-track-cta="form-submit" style="grid-column: 1 / -1;">LET'S TALK</button>
+            <small class="full-width">This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy">Privacy Policy</a> and <a href="https://policies.google.com/terms">Terms of Service</a> apply.</small>
+        </form>
+    </div>
+</section>

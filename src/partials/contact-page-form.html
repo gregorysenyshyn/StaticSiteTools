@@ -1,0 +1,33 @@
+<!-- Contact Form -->
+<section class="lead-form-section two-col-form" id="contact-form-section">
+  <div class="form-container">
+    <h2>How To Reach Us</h2>
+    <form id="contact-form" action="{{api_url}}/contact" method="post">
+      <div class="form-group">
+        <label for="name">Name *</label>
+        <input type="text" id="name" name="name" autocomplete="name" placeholder="Jane Doe" required>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email *</label>
+        <input type="text" id="email" name="email" autocomplete="email" placeholder="jane@example.com" required>
+      </div>
+
+      <div class="form-group full-width">
+        <label for="phone">Phone</label>
+        <input type="text" id="phone" name="phone" autocomplete="phone" placeholder="(613) 212-5989">
+      </div>
+
+      <div class="form-group full-width">
+        <label for="message">Message *</label>
+        <textarea name="message" id="message" cols="30" rows="10" placeholder="How can we help?" required style="width: 100%; padding: 0.75rem; border: 2px solid #000; border-radius: 0; font-family: inherit; font-size: 1rem;"></textarea>
+      </div>
+
+      <div class="form-group full-width">
+        <button type="submit" class="btn-primary" onclick="submitRecaptchaForm(event, '{{recaptcha_sitekey}}', 'contact', 'contact-form', '/landing/thank-you', '/landing/error')">SUBMIT</button>
+      </div>
+
+      <small>This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy">Privacy Policy</a> and <a href="https://policies.google.com/terms">Terms of Service</a> apply.</small>
+    </form>
+  </div>
+</section>

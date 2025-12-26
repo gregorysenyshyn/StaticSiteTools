@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% if production %}
+    {% include 'analytics-head.html' %}
+    {% include 'google-ads-conversion.html' %}
+    {% else %}
+    <script>
+      function gtag_report_conversion(url) { return true; }
+    </script>
+    {% endif %}
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="{{description}}">
+    <link rel="icon" type="image/png" href="{{ images_url }}/favicon16.png" sizes="16x16">
+    <link rel="icon" type="image/png" href="{{ images_url }}/favicon32.png" sizes="32x32">
+    <link rel="apple-touch-icon" sizes="256x256" href="{{ images_url }}/favicon256.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Permanent+Marker&display=swap" rel="stylesheet">
+    {% block css %}
+    <link rel="stylesheet" href="/css/style.css">
+    {% endblock css %}
+    {% if canonical %}
+      <link rel="canonical" href="{{canonical}}">
+    {% endif %}
+
+    <!-- Recaptcha -->
+    <script src="https://www.google.com/recaptcha/enterprise.js?render={{recaptcha_sitekey}}" async defer></script>
+    <script src="/js/scripts.js" defer></script>
+
+    {% block core_js %}
+    {% endblock core_js %}
+
+    {% block head %}
+    {% endblock head %}
+
+    {% block title %}
+    <title>{{title}} | Asynchronous Academy</title>
+    {% endblock title %}
+
+  </head>
+
+  <body>
+    <a href="#main-content" class="skip-link">Skip to content</a>
+    {% if production %}
+    {% include 'analytics-body.html' %}
+    {% endif %}
+
+    {% block header %}
+    {% include 'header.html' %}
+    {% endblock header %}
+
+    {% block content %}
+    <div id="hero" style="background-image: url('{{ images_url }}/{{hero_image}}');" {{hero_classes}}>
+      <div id="hero-text">
+      {% block hero_text %}
+      {% endblock hero_text %}
+      </div>
+    </div>
+    <div id="main-content" tabindex="-1"></div>
+    <main {{main_classes}}>
+      {% block main %}
+      {% endblock main %}
+    </main>
+    {% endblock content %}
+
+    {% block footer %}
+    {% include 'footer.html' %}
+    {% endblock footer %}
+
+    {% block scripts %}
+    {% if stripe_price_id is defined or enroll_banner is defined %}
+    <script src="/js/checkout.js"></script>
+    {% endif %}
+    {% endblock scripts %}
+
+  </body>
+</html>

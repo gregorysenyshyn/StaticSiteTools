@@ -1,0 +1,81 @@
+<section class="lead-form-section" id="callback-form-wrapper">
+    <div class="form-container">
+        <h2>Want to Talk to Someone?</h2>
+        <p>Fill out the form below to speak with an enrollment advisor.</p>
+
+        <form id="lead-form" novalidate data-track-form="lead-submit" data-api-url="{{ api_url }}" data-recaptcha-sitekey="{{ recaptcha_sitekey }}">
+            <div class="form-group-row">
+                <div class="form-group">
+                    <label for="first_name">First Name *</label>
+                    <input type="text" id="first_name" name="first_name" required placeholder="Jane">
+                    <div class="error-msg" aria-live="polite"></div>
+                </div>
+                <div class="form-group">
+                    <label for="last_name">Last Name *</label>
+                    <input type="text" id="last_name" name="last_name" required placeholder="Doe">
+                    <div class="error-msg" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="role">I am a... *</label>
+                <select id="role" name="role" required>
+                    <option value="">Select Role...</option>
+                    <option value="parent">Parent / Guardian</option>
+                    <option value="student">Student</option>
+                </select>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" name="email" required placeholder="jane@example.com">
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number (Optional)</label>
+                <input type="tel" id="phone" name="phone" placeholder="(613) 212-5989">
+            </div>
+
+            <div class="form-group">
+                <label for="grade">Current Grade *</label>
+                <select id="grade" name="grade" required>
+                    <option value="">Select Grade...</option>
+                    <option value="8">Grade 8</option>
+                    <option value="9">Grade 9</option>
+                    <option value="10">Grade 10</option>
+                    <option value="11">Grade 11</option>
+                    <option value="12">Grade 12</option>
+                    <option value="adult">Adult Learner</option>
+                </select>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="goal">Primary Goal *</label>
+                <select id="goal" name="goal" required>
+                    <option value="">Select Goal...</option>
+                    <option value="university">University Acceptance</option>
+                    <option value="college">College Acceptance</option>
+                    <option value="catchup">Catch Up / Credit Recovery</option>
+                    <option value="flexibility">Flexible Schedule</option>
+                    <option value="other">Other</option>
+                </select>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="consent" name="consent" required>
+                <label for="consent">I consent to be contacted by Asynchronous Academy regarding educational programs.</label>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+             <div class="form-group">
+                 <div class="error-msg" aria-live="polite"></div>
+             </div>
+
+            <button type="submit" class="btn-primary" data-track-cta="form-submit">LET'S TALK</button>
+            <small>This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy">Privacy Policy</a> and <a href="https://policies.google.com/terms">Terms of Service</a> apply.</small>
+        </form>
+    </div>
+</section>

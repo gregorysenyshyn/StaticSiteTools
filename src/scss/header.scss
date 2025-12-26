@@ -1,0 +1,176 @@
+/* Neo-Brutalist Header */
+.neo-header {
+  background: white;
+  border-bottom: $neo-border;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+
+  .header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+
+    img {
+      height: 40px;
+    }
+
+    .logo-text {
+      font-weight: 900;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      color: $darkblue;
+    }
+  }
+
+  .desktop-nav {
+    display: none;
+    gap: 2rem;
+    align-items: center;
+
+    @include md {
+      display: flex;
+    }
+
+    a {
+      color: $darkblue;
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 1rem;
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border: 3px solid transparent; /* Reserve space for hover border */
+
+      &:hover {
+        background: $orange;
+        border: $neo-border;
+        box-shadow: $neo-shadow;
+        transform: translate(-2px, -2px);
+        text-decoration: none;
+      }
+
+      &:active {
+        transform: translate(0, 0);
+        box-shadow: none;
+      }
+    }
+  }
+
+  /* Mobile Menu */
+  .mobile-menu-toggle {
+    display: block;
+    position: relative;
+    z-index: 1001;
+
+    @include md {
+      display: none;
+    }
+
+    /* Hamburger Button Style */
+    .menu-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      border: $neo-border;
+      background: white;
+      box-shadow: $neo-shadow;
+      transition: all 0.2s;
+
+      span {
+        display: block;
+        width: 20px;
+        height: 3px;
+        background: $darkblue;
+        position: relative;
+
+        &::before, &::after {
+          content: '';
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          background: $darkblue;
+          left: 0;
+          transition: all 0.2s;
+        }
+
+        &::before { top: -7px; }
+        &::after { bottom: -7px; }
+      }
+    }
+
+    /* Checkbox Logic */
+    #menu-toggle {
+      display: none;
+
+      &:checked ~ .menu-btn {
+        background: $orange;
+        span {
+          background: transparent;
+          &::before { transform: rotate(45deg); top: 0; }
+          &::after { transform: rotate(-45deg); bottom: 0; }
+        }
+      }
+    }
+
+    /* Checkbox Logic */
+    #menu-toggle {
+      display: none;
+
+      &:checked ~ .menu-btn {
+        background: $orange;
+        span {
+          background: transparent;
+          &::before { transform: rotate(45deg); top: 0; }
+          &::after { transform: rotate(-45deg); bottom: 0; }
+        }
+      }
+
+      &:checked ~ .mobile-menu {
+        display: flex;
+      }
+    }
+
+    /* Dropdown/Overlay Menu */
+    .mobile-menu {
+      display: none;
+      flex-direction: column;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      width: 250px;
+      background: white;
+      border: $neo-border;
+      box-shadow: $neo-shadow;
+      padding: 1rem;
+      gap: 1rem;
+      margin-top: 1rem;
+
+      a {
+        text-align: center;
+        padding: 0.75rem;
+        border: $neo-border;
+        font-weight: 800;
+        color: $darkblue;
+        text-transform: uppercase;
+
+        &:hover {
+          background: $orange;
+        }
+      }
+    }
+  }
+}

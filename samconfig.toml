@@ -2,9 +2,9 @@ version = 0.1
 [default]
 [default.deploy]
 [default.deploy.parameters]
-stack_name = "website-lambdas"
+stack_name = "CHANGE_ME_STACK"
 resolve_s3 = true
-s3_prefix = "website-lambdas"
+s3_prefix = "CHANGE_ME_STACK"
 region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"

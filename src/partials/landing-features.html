@@ -1,0 +1,11 @@
+<section class="who-for" id="features">
+    <h2>{{ features_title | default("Who Succeeds Here?") }}</h2>
+    <div class="card-grid">
+        {% for feature in features %}
+        <div class="card">
+            <h3>{{ feature.title }}</h3>
+            <p>{{ feature.description }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>

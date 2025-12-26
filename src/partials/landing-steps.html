@@ -1,0 +1,12 @@
+<section class="how-works">
+    <h2>{{ steps_title | default("How It Works") }}</h2>
+    <div class="steps-grid">
+        {% for step in steps %}
+        <div class="step">
+            <div class="step-num">{{ loop.index }}</div>
+            <h3>{{ step.title }}</h3>
+            <p>{{ step.description }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>

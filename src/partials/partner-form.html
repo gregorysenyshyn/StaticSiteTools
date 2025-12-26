@@ -1,0 +1,35 @@
+<div class="comment_form">
+  <h2>Connect with Us</h2>
+  <form id="partner-request" action="{{api_url}}" method="post">
+    <div class="row">
+
+      <div class="col-md-12 fix_p_r">
+        <p>Complete this information form to request more information about offering courses with Asynchronous Academy. We are happy to provide promotional materials or a guest login for our Classroom area so you can familiarize yourself with our courses.</p>
+        <p>There's no cost and no commitment.</p>
+      </div>
+
+      <div class="col-md-6 fix_p_r">
+        <input type="text" name="fn" placeholder="First Name *" aria-label="First Name" autocomplete="name" required>
+      </div>
+
+      <div class="col-md-6 fix_p_r">
+        <input type="text" name="ln" placeholder="Last Name *" aria-label="Last Name" autocomplete="name" required>
+      </div>
+
+      <div class="col-md-6 fix_p_r">
+        <input type="text" name="email" placeholder="E-Mail *" aria-label="E-Mail" autocomplete="email" required>
+      </div>
+
+      <div class="col-md-6 fix_p_r">
+        <input type="text" name="website" placeholder="Website/Social Media" aria-label="Website or Social Media">
+      </div>
+
+      <div class="col-md-12 fix_p_r">
+        <input type="hidden" name="form-name" value="partner-request">
+        <span class="loader hidden"></span>
+        <input type="submit" onclick="submitRecaptchaForm(event, '{{recaptcha_sitekey}}', 'partner_request', 'partner-request', '/thank-you', '/error')" value="Submit">
+      </div>
+
+    </div>
+  </form>
+</div>

@@ -1,0 +1,118 @@
+/* Neo-Brutalist Footer */
+footer {
+  background: $darkblue;
+  color: white;
+  border-top: $neo-border;
+  padding: 4rem 2rem;
+  display: grid;
+  gap: 3rem;
+
+  @include md {
+    grid-template-columns: repeat(3, 1fr);
+    align-items: start;
+    text-align: left;
+  }
+
+  h2 {
+    color: $orange;
+    text-shadow: 2px 2px 0px black;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    @include md { text-align: inherit; }
+  }
+
+  p, a {
+    color: white;
+    font-weight: 500;
+  }
+
+  a:hover {
+    color: $orange;
+    text-decoration-color: $orange;
+  }
+
+  /* Section 1: Logos & Social */
+  #footer-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    @include md { align-items: flex-start; }
+
+    #footer-logos {
+      margin-bottom: 2rem;
+      text-align: center;
+      @include md { text-align: left; }
+
+      #footer-logo-images {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        @include md { justify-content: flex-start; }
+
+        img {
+          height: 40px;
+          /* Removed box styling as requested */
+          background: transparent;
+          padding: 0;
+          border: none;
+          box-shadow: none;
+        }
+      }
+    }
+
+    #footer-social-links {
+      display: flex;
+      gap: 1.5rem;
+
+      img {
+        width: 32px;
+        transition: transform 0.2s;
+        &:hover {
+          transform: scale(1.1);
+        }
+      }
+    }
+  }
+
+  /* Section 2: Description */
+  #footer-center {
+    text-align: center;
+    @include md { text-align: left; }
+
+    .footer-description {
+      margin-bottom: 1rem;
+      line-height: 1.5;
+    }
+  }
+
+  /* Section 3: Links */
+  #footer-right {
+    text-align: center;
+    @include md { text-align: right; }
+
+    ul {
+      list-style: none;
+      padding: 0;
+
+      li {
+        margin-bottom: 0.75rem;
+      }
+
+      a {
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+      }
+    }
+  }
+
+  /* Bottom Copyright - Full Width */
+  #footer-bottom {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 2px solid $medblue;
+    margin-top: 1rem;
+    color: $lightblue;
+    font-size: 0.9rem;
+  }
+}

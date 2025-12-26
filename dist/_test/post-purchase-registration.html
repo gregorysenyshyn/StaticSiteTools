@@ -1,0 +1,341 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test: Post-Purchase Registration</title>
+    <script src="https://www.google.com/recaptcha/enterprise.js?render=CHANGE_ME_RECAPTCHA_SITEKEY" async defer></script>
+    <link rel="stylesheet" href="../css/landing.css">
+
+    <script src="../js/register.js" defer></script>
+
+    <style>
+        body { background-color: #f4f4f4; padding: 20px; }
+        .test-wrapper { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; }
+        .test-header { text-align: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="test-wrapper">
+        <div class="test-header">
+            <h1>Test Mode: Post-Purchase Registration</h1>
+            <p><a href="index.html">&larr; Back to Test Index</a></p>
+        </div>
+        <div class="test-content">
+            <section class="neo-grid-section" style="padding: 2rem; max-width: 800px; margin: 0 auto;">
+  <div class="neo-card">
+    <div id="registration-context" style="display:none; margin-bottom: 2rem; background: #284B99; color: white; padding: 1.5rem; border: 3px solid #000; box-shadow: 6px 6px 0px #000; text-align: center;">
+        <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.25rem; color: white;">Completing Registration For:</h3>
+        <p id="context-course-name" style="font-weight: 900; font-size: 2.5rem; margin-bottom: 0; color: #FF9869; text-shadow: 3px 3px 0px #000; line-height: 1.2; text-transform: uppercase;"></p>
+    </div>
+
+    <h2 class="neo-text-h2" style="text-align: center; margin-bottom: 2rem;">Course Registration</h2>
+
+    <form id="registration-form" data-api-url="REPLACE_WITH_SAM_OUTPUT_API_URL" data-recaptcha-sitekey="CHANGE_ME_RECAPTCHA_SITEKEY">
+      <input type="hidden" name="payment_id" id="payment_id">
+      <input type="hidden" name="action" value="course_registration">
+
+      <!-- Student Info -->
+      <fieldset class="neo-fieldset" style="border: none; padding: 0; margin-bottom: 2rem;">
+        <legend class="neo-text-h3" style="margin-bottom: 1rem; border-bottom: 2px solid #000; display: block; width: 100%;">Student Information</legend>
+
+        <div class="form-group">
+          <label for="oen" class="neo-label">OEN (Ontario Education Number)</label>
+          <input type="text" id="oen" name="oen" class="neo-input" placeholder="e.g., 123-456-789" inputmode="numeric" pattern="[0-9\s-]*" required>
+          <div class="error-msg" aria-live="polite"></div>
+        </div>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="preferred_name" class="neo-label">Preferred Name</label>
+            <input type="text" id="preferred_name" name="preferred_name" class="neo-input" required>
+            <div class="error-msg" aria-live="polite"></div>
+          </div>
+          <div class="form-group">
+            <label for="first_name" class="neo-label">First Name</label>
+            <input type="text" id="first_name" name="first_name" class="neo-input" autocomplete="given-name" required>
+            <div class="error-msg" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="middle_name" class="neo-label">Middle Name (Optional)</label>
+            <input type="text" id="middle_name" name="middle_name" class="neo-input" autocomplete="additional-name">
+          </div>
+          <div class="form-group">
+            <label for="last_name" class="neo-label">Last Name</label>
+            <input type="text" id="last_name" name="last_name" class="neo-input" autocomplete="family-name" required>
+            <div class="error-msg" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label for="grade" class="neo-label">Current Grade</label>
+              <select id="grade" name="grade" class="neo-input" required style="height: auto;">
+                  <option value="" disabled selected>Select Grade</option>
+                  <option value="8">Grade 8</option>
+                  <option value="9">Grade 9</option>
+                  <option value="10">Grade 10</option>
+                  <option value="11">Grade 11</option>
+                  <option value="12">Grade 12</option>
+                  <option value="Adult">Adult Learner</option>
+              </select>
+              <div class="error-msg" aria-live="polite"></div>
+            </div>
+            <div class="form-group">
+              <label for="dob" class="neo-label">Date of Birth</label>
+              <input type="date" id="dob" name="dob" class="neo-input" required>
+              <div class="error-msg" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label for="gender" class="neo-label">Gender</label>
+              <select id="gender" name="gender" class="neo-input" required style="height: auto;" onchange="toggleOtherField('gender', 'gender_other_container')">
+                  <option value="" disabled selected>Select...</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Non-binary">Non-binary</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                  <option value="Other">Other</option>
+              </select>
+              <div class="error-msg" aria-live="polite"></div>
+            </div>
+            <div class="form-group">
+              <label for="status_in_canada" class="neo-label">Status in Canada</label>
+              <select id="status_in_canada" name="status_in_canada" class="neo-input" required style="height: auto;" onchange="toggleOtherField('status_in_canada', 'status_other_container')">
+                  <option value="" disabled selected>Select...</option>
+                  <option value="Canadian Citizen">Canadian Citizen</option>
+                  <option value="Permanent Resident">Permanent Resident</option>
+                  <option value="International Student">International Student</option>
+                  <option value="Other">Other</option>
+              </select>
+              <div class="error-msg" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <div class="form-group" id="gender_other_container" style="display:none; margin-top: 1rem;">
+            <label for="gender_other" class="neo-label">Gender (Please Specify)</label>
+            <input type="text" id="gender_other" name="gender_other" class="neo-input">
+        </div>
+
+        <div class="form-group" id="status_other_container" style="display:none; margin-top: 1rem;">
+            <label for="status_other" class="neo-label">Status (Please Specify)</label>
+            <input type="text" id="status_other" name="status_other" class="neo-input">
+        </div>
+
+        <div class="form-group">
+            <label for="student_email" class="neo-label">Student Email</label>
+            <input type="email" id="student_email" name="student_email" class="neo-input" required>
+            <div class="error-msg" aria-live="polite"></div>
+        </div>
+
+      </fieldset>
+
+      <!-- Parent Info -->
+      <fieldset class="neo-fieldset" style="border: none; padding: 0; margin-bottom: 2rem;">
+        <legend class="neo-text-h3" style="margin-bottom: 1rem; border-bottom: 2px solid #000; display: block; width: 100%;">Parent/Guardian Information</legend>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label for="parent_first_name" class="neo-label">Parent First Name</label>
+              <input type="text" id="parent_first_name" name="parent_first_name" class="neo-input" required>
+              <div class="error-msg" aria-live="polite"></div>
+            </div>
+            <div class="form-group">
+              <label for="parent_last_name" class="neo-label">Parent Last Name</label>
+              <input type="text" id="parent_last_name" name="parent_last_name" class="neo-input" required>
+              <div class="error-msg" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label for="parent_email" class="neo-label">Parent Email</label>
+                <input type="email" id="parent_email" name="parent_email" class="neo-input" required>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+            <div class="form-group">
+                <label for="parent_phone" class="neo-label">Parent Phone Number</label>
+                <input type="tel" id="parent_phone" name="parent_phone" class="neo-input" placeholder="e.g., 123-456-7890" inputmode="tel" required>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+        </div>
+
+      </fieldset>
+
+      <!-- Address Info -->
+      <fieldset class="neo-fieldset" style="border: none; padding: 0; margin-bottom: 2rem;">
+        <legend class="neo-text-h3" style="margin-bottom: 1rem; border-bottom: 2px solid #000; display: block; width: 100%;">Address</legend>
+
+        <div class="form-group">
+            <label for="street_address" class="neo-label">Street Address</label>
+            <input type="text" id="street_address" name="street_address" class="neo-input" autocomplete="street-address" required>
+            <div class="error-msg" aria-live="polite"></div>
+        </div>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label for="city" class="neo-label">City/Town</label>
+                <input type="text" id="city" name="city" class="neo-input" autocomplete="address-level2" required>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+            <div class="form-group">
+                <label for="province" class="neo-label">Province</label>
+                <select id="province" name="province" class="neo-input" required style="height: auto;">
+                    <option value="ON">Ontario</option>
+                    <option value="AB">Alberta</option>
+                    <option value="BC">British Columbia</option>
+                    <option value="MB">Manitoba</option>
+                    <option value="NB">New Brunswick</option>
+                    <option value="NL">Newfoundland and Labrador</option>
+                    <option value="NS">Nova Scotia</option>
+                    <option value="PE">Prince Edward Island</option>
+                    <option value="QC">Quebec</option>
+                    <option value="SK">Saskatchewan</option>
+                    <option value="NT">Northwest Territories</option>
+                    <option value="NU">Nunavut</option>
+                    <option value="YT">Yukon</option>
+                </select>
+                <div class="error-msg" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="postal_code" class="neo-label">Postal Code</label>
+            <input type="text" id="postal_code" name="postal_code" class="neo-input" autocomplete="postal-code" required>
+            <div class="error-msg" aria-live="polite"></div>
+        </div>
+
+      </fieldset>
+
+      <!-- School Info -->
+      <fieldset class="neo-fieldset" style="border: none; padding: 0; margin-bottom: 2rem;">
+        <legend class="neo-text-h3" style="margin-bottom: 1rem; border-bottom: 2px solid #000; display: block; width: 100%;">School Information</legend>
+
+        <div class="form-group">
+            <label for="main_board" class="neo-label">Main School Board</label>
+            <select id="main_board" name="main_board" class="neo-input" required style="height: auto;" onchange="populateSchools()">
+                <option value="" disabled selected>Select Board</option>
+                <!-- Populated by JS -->
+            </select>
+            <div class="error-msg" aria-live="polite"></div>
+        </div>
+
+        <div class="form-group">
+            <label for="main_school" class="neo-label">Main School</label>
+            <select id="main_school" name="main_school" class="neo-input" required disabled style="height: auto;">
+                <option value="" disabled selected>Select School</option>
+                <!-- Populated by JS -->
+            </select>
+            <div class="error-msg" aria-live="polite"></div>
+        </div>
+
+      </fieldset>
+
+      <button type="submit" class="neo-btn" style="width: 100%; margin-top: 1rem;">Complete Registration</button>
+
+      <div id="form-message" style="margin-top: 1rem; text-align: center;" aria-live="polite"></div>
+
+    </form>
+  </div>
+</section>
+
+<script>
+// Load school data
+let schoolData = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Fetch school data
+    fetch('/schools.json')
+      .then(response => {
+        if (!response.ok) {
+           console.error("Failed to load school data: " + response.statusText);
+           return {};
+        }
+        return response.json();
+      })
+      .then(data => {
+          schoolData = data;
+          const boardSelect = document.getElementById('main_board');
+
+          if (boardSelect && Object.keys(schoolData).length > 0) {
+              // Populate boards
+              Object.keys(schoolData).sort().forEach(board => {
+                  const option = document.createElement('option');
+                  option.value = board;
+                  option.textContent = board;
+                  boardSelect.appendChild(option);
+              });
+          }
+      })
+      .catch(error => console.error('Error loading school data:', error));
+});
+
+function populateSchools() {
+    const boardSelect = document.getElementById('main_board');
+    const schoolSelect = document.getElementById('main_school');
+    const selectedBoard = boardSelect.value;
+
+    // Clear existing options
+    schoolSelect.innerHTML = '<option value="" disabled selected>Select School</option>';
+
+    if (selectedBoard && schoolData[selectedBoard]) {
+        schoolSelect.disabled = false;
+        schoolData[selectedBoard].sort().forEach(school => {
+            const option = document.createElement('option');
+            option.value = school;
+            option.textContent = school;
+            schoolSelect.appendChild(option);
+        });
+    } else {
+        schoolSelect.disabled = true;
+    }
+}
+
+function toggleOtherField(selectId, containerId) {
+    const select = document.getElementById(selectId);
+    const container = document.getElementById(containerId);
+    const input = container.querySelector('input');
+
+    if (select && container && input) {
+        if (select.value === 'Other') {
+            container.style.display = 'block';
+            input.required = true;
+        } else {
+            container.style.display = 'none';
+            input.required = false;
+            input.value = ''; // Clear value
+        }
+    }
+}
+</script>
+        </div>
+    </div>
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const prefillData = {"oen": "123-456-789", "preferred_name": "Test", "first_name": "Student", "middle_name": "J", "last_name": "User", "grade": "11", "dob": "2007-01-01", "gender": "Non-binary", "status_in_canada": "Canadian Citizen", "student_email": "student@example.com", "parent_first_name": "Parent", "parent_last_name": "User", "parent_email": "parent@example.com", "parent_phone": "555-123-4567", "street_address": "123 Test St", "city": "Toronto", "province": "ON", "postal_code": "M5V 2H1", "main_board": "Toronto District School Board"};
+                console.log("Prefilling form with:", prefillData);
+
+                for (const [key, value] of Object.entries(prefillData)) {
+                    const inputs = document.querySelectorAll(`[name="${key}"], [id="${key}"]`);
+                    inputs.forEach(input => {
+                        if (input.type === 'checkbox' || input.type === 'radio') {
+                            if (input.value === value.toString() || value === true) {
+                                input.checked = true;
+                            }
+                        } else {
+                            input.value = value;
+                        }
+                    });
+                }
+            });
+        </script>
+
+</body>
+</html>
