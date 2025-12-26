@@ -643,10 +643,23 @@ def deploy_site(env):
     perform_site_deploy(env, config_file, stack_name)
     print_sam_outputs(stack_name, data['options'])
 
-@cli.command()
+@cli.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True))
 @click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
 def deploy_all(env):
     """Interactive wizard to deploy infrastructure and/or website."""
+
+    # Debug: Check for extra args (recursion loop detection)
+    ctx = click.get_current_context()
+    if ctx.args:
+        click.echo(f"WARNING: Received extra arguments: {ctx.args}")
+        # Heuristic: If arguments look like secrets keys, we are in a recursion loop.
+        # This prevents the infinite loop/crash.
+        potential_secrets = [arg for arg in ctx.args if 'Key' in arg or 'Secret' in arg or 'Id' in arg]
+        if potential_secrets:
+            click.echo("ERROR: Detected potential recursion loop with secrets passed as arguments.")
+            click.echo("       This usually happens if a credential helper or subprocess is invoking manage.py.")
+            click.echo("       Aborting to prevent unwanted behavior.")
+            sys.exit(1)
 
     config_file, stack_name = get_env_details(env)
 
