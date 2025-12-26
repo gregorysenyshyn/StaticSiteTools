@@ -13,7 +13,7 @@ import requests
 
 # Ensure we can import from local modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from shared import utils
+from shared import utils, emails
 from shared.client import get_client
 from website import tools
 
@@ -680,6 +680,70 @@ def deploy_all(env):
 
 # Alias for backward compatibility / ease of use
 cli.add_command(deploy_all, name='deploy')
+
+# --- Email Management Commands ---
+
+@cli.group(name='emails')
+def emails_cli():
+    """Manage AWS SES Email Templates."""
+    pass
+
+@emails_cli.command()
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment (for AWS profile).')
+def list(env):
+    """List all email templates in AWS SES."""
+    config_file, _ = get_env_details(env)
+    if not os.path.exists(config_file):
+        config_file = 'data.yaml' if os.path.exists('data.yaml') else None
+
+    if not config_file:
+         click.echo(f"Config file for {env} not found. Cannot determine AWS profile.")
+         return
+
+    data = load_config(config_file)
+    # Use sesv2 as per other scripts (mail_list/send_email.py uses sesv2)
+    client = get_client('sesv2', data['options'])
+    emails.list_templates(client)
+
+@emails_cli.command()
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment (for AWS profile).')
+@click.option('--delete', is_flag=True, help='Interactively delete templates in SES that do not exist locally.')
+@click.option('--directory', default='email_templates', help='Local directory containing templates.')
+def sync(env, delete, directory):
+    """Sync local templates to AWS SES."""
+    config_file, _ = get_env_details(env)
+    if not os.path.exists(config_file):
+        config_file = 'data.yaml' if os.path.exists('data.yaml') else None
+
+    if not config_file:
+         click.echo(f"Config file for {env} not found. Cannot determine AWS profile.")
+         return
+
+    data = load_config(config_file)
+    client = get_client('sesv2', data['options'])
+    emails.sync_templates(client, directory=directory, delete_orphans=delete)
+
+@emails_cli.command()
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment (for AWS profile).')
+@click.argument('template_name')
+def delete(env, template_name):
+    """Delete a specific template from AWS SES."""
+    config_file, _ = get_env_details(env)
+    if not os.path.exists(config_file):
+        config_file = 'data.yaml' if os.path.exists('data.yaml') else None
+
+    if not config_file:
+         click.echo(f"Config file for {env} not found. Cannot determine AWS profile.")
+         return
+
+    data = load_config(config_file)
+    client = get_client('sesv2', data['options'])
+    try:
+        client.delete_email_template(TemplateName=template_name)
+        click.echo(f"Template '{template_name}' deleted.")
+    except Exception as e:
+        click.echo(f"Error deleting template: {e}")
+
 
 if __name__ == '__main__':
     cli()
