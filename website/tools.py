@@ -177,6 +177,20 @@ def handle_scss(data, dest_path):
         f.write(sass.compile(string=scss_string))
     print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
 
+# ######## #
+#  IMAGES  #
+# ######## #
+
+
+def handle_images(options):
+    local_images = os.path.join(os.getcwd(),
+                                options['images'])
+    image_dest = options['dist']
+    print((f'linking {local_images} to {image_dest}...'), end='')
+    subprocess.run(['ln', '-s', local_images, image_dest])
+    print(' Done!')
+
+
 # ######### #
 #   AUDIO   #
 # ######### #
@@ -334,6 +348,21 @@ def build_pageset(pageset, options):
         page['data']['recaptcha_sitekey'] = options.get('recaptcha_sitekey')
         page['data']['api_url'] = options.get('api_url')
         page['data']['images_url'] = options.get('images_url')
+        page['data']['stripe_publishable_key'] = options.get('stripe_publishable_key')
+
+        # GLOBAL STRIPE OVERRIDE FOR DEV
+        global_price_id = options.get('global_stripe_price_id')
+        if global_price_id:
+            # Override top-level price ID if it exists
+            if page['data'].get('stripe_price_id'):
+                page['data']['stripe_price_id'] = global_price_id
+
+            # Override enroll_banner price IDs
+            if page['data'].get('enroll_banner'):
+                for item in page['data']['enroll_banner']:
+                    if item.get('stripe_price_id'):
+                        item['stripe_price_id'] = global_price_id
+
         if options.get('production'):
             page['data']['production'] = True
 
@@ -370,6 +399,18 @@ def generate_test_pages(data, options):
         context['images_url'] = options.get('images_url')
         context['recaptcha_sitekey'] = options.get('recaptcha_sitekey')
         context['stripe_publishable_key'] = options.get('stripe_publishable_key')
+
+        # GLOBAL STRIPE OVERRIDE FOR TEST PAGES
+        global_price_id = options.get('global_stripe_price_id')
+        if global_price_id:
+             # Check context for enroll_banner or direct price_id
+             if context.get('stripe_price_id'):
+                 context['stripe_price_id'] = global_price_id
+
+             if context.get('enroll_banner'):
+                for item in context['enroll_banner']:
+                    if item.get('stripe_price_id'):
+                        item['stripe_price_id'] = global_price_id
 
         print(f"  Generating test page for: {form_name}")
 
