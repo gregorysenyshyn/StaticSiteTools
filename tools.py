@@ -9,6 +9,7 @@ import json
 
 from jinja2 import BaseLoader
 from jinja2 import Environment
+from jinja2 import DebugUndefined
 
 import yaml
 import sass
@@ -176,20 +177,6 @@ def handle_scss(data, dest_path):
     with open(os.path.join(data['options']['dist'], dest_path), 'w') as f:
         f.write(sass.compile(string=scss_string))
     print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
-
-# ######## #
-#  IMAGES  #
-# ######## #
-
-
-def handle_images(options):
-    local_images = os.path.join(os.getcwd(),
-                                options['images'])
-    image_dest = options['dist']
-    print((f'linking {local_images} to {image_dest}...'), end='')
-    subprocess.run(['ln', '-s', local_images, image_dest])
-    print(' Done!')
-
 
 # ######### #
 #   AUDIO   #
@@ -371,6 +358,72 @@ def build_pageset(pageset, options):
             page['data']['nav_pages'] = nav_pages
 
         build_page(page, j2_env, options)
+
+
+def build_emails(data):
+    """Builds email templates from src/emails."""
+    print(f"\n{time.asctime()} — Building Emails...")
+
+    # We iterate over environments found in src/emails/
+    # Expected structure: src/emails/dev/*.html, src/emails/prod/*.html
+    email_root = 'src/emails'
+    template_root = 'email_templates'
+
+    if not os.path.exists(email_root):
+        print(f"Warning: {email_root} not found. Skipping email build.")
+        return
+
+    # Setup Jinja Environment for Emails (Layouts and Partials are shared)
+    # GlobLoader requires glob patterns, not just directory names
+    template_paths = [
+        'src/layouts/*.html',
+        'src/partials/*.html',
+        'src/partials/email/*.html'
+    ]
+    # Use DebugUndefined to preserve {{ variables }} for the backend to fill
+    j2_env = Environment(
+        loader=GlobLoader(template_paths),
+        trim_blocks=True,
+        undefined=DebugUndefined
+    )
+
+    # Walk through subdirectories (environments) in src/emails
+    for env in ['dev', 'prod']:
+        src_dir = os.path.join(email_root, env)
+        dest_dir = os.path.join(template_root, env)
+
+        if not os.path.exists(src_dir):
+            continue
+
+        print(f"  Processing environment: {env}...")
+        os.makedirs(dest_dir, exist_ok=True)
+
+        email_files = glob.glob(os.path.join(src_dir, '*.html'))
+
+        for email_file in email_files:
+            filename = os.path.basename(email_file)
+            print(f"    Building {filename}...", end="")
+
+            try:
+                # Read source content
+                with open(email_file, 'r') as f:
+                    content = f.read()
+
+                # Create a template from the content
+                template = j2_env.from_string(content)
+
+                # Render with empty context
+                rendered_html = template.render()
+
+                # Write to destination
+                dest_path = os.path.join(dest_dir, filename)
+                with open(dest_path, 'w') as f:
+                    f.write(rendered_html)
+
+                print(" Done!")
+
+            except Exception as e:
+                print(f" Failed: {e}")
 
 
 def generate_test_pages(data, options):
