@@ -554,17 +554,13 @@ def build_local(config):
     build_site(data)
 
 @cli.command()
-@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
-def sync_images(env):
+def sync_images():
     """Syncs local images/ directory to the shared assets bucket."""
-    config_file, _ = get_env_details(env)
+    config_file = 'data.yaml'
 
     if not os.path.exists(config_file):
-        if os.path.exists('data.yaml'):
-            config_file = 'data.yaml'
-        else:
-            click.echo(f"Config file for {env} not found.")
-            return
+        click.echo("Config file data.yaml not found.")
+        return
 
     data = load_config(config_file)
     perform_image_sync(data)
