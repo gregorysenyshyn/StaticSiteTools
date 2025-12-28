@@ -178,6 +178,20 @@ def handle_scss(data, dest_path):
         f.write(sass.compile(string=scss_string))
     print(' Done in {0} seconds'.format(round(float(time.time() - t1), 4)))
 
+# ######## #
+#  IMAGES  #
+# ######## #
+
+
+def handle_images(options):
+    local_images = os.path.join(os.getcwd(),
+                                options['images'])
+    image_dest = options['dist']
+    print((f'linking {local_images} to {image_dest}...'), end='')
+    subprocess.run(['ln', '-s', local_images, image_dest])
+    print(' Done!')
+
+
 # ######### #
 #   AUDIO   #
 # ######### #
@@ -368,7 +382,7 @@ def build_emails(data):
     # Expected structure: src/emails/dev/*.html, src/emails/prod/*.html
     email_root = 'src/emails'
     template_root = 'email_templates'
-
+    
     if not os.path.exists(email_root):
         print(f"Warning: {email_root} not found. Skipping email build.")
         return
@@ -376,13 +390,13 @@ def build_emails(data):
     # Setup Jinja Environment for Emails (Layouts and Partials are shared)
     # GlobLoader requires glob patterns, not just directory names
     template_paths = [
-        'src/layouts/*.html',
-        'src/partials/*.html',
+        'src/layouts/*.html', 
+        'src/partials/*.html', 
         'src/partials/email/*.html'
     ]
     # Use DebugUndefined to preserve {{ variables }} for the backend to fill
     j2_env = Environment(
-        loader=GlobLoader(template_paths),
+        loader=GlobLoader(template_paths), 
         trim_blocks=True,
         undefined=DebugUndefined
     )
@@ -399,29 +413,29 @@ def build_emails(data):
         os.makedirs(dest_dir, exist_ok=True)
 
         email_files = glob.glob(os.path.join(src_dir, '*.html'))
-
+        
         for email_file in email_files:
             filename = os.path.basename(email_file)
             print(f"    Building {filename}...", end="")
-
+            
             try:
                 # Read source content
                 with open(email_file, 'r') as f:
                     content = f.read()
-
+                
                 # Create a template from the content
                 template = j2_env.from_string(content)
-
+                
                 # Render with empty context
                 rendered_html = template.render()
-
+                
                 # Write to destination
                 dest_path = os.path.join(dest_dir, filename)
                 with open(dest_path, 'w') as f:
                     f.write(rendered_html)
-
+                    
                 print(" Done!")
-
+                
             except Exception as e:
                 print(f" Failed: {e}")
 

@@ -156,11 +156,20 @@ def build_site(data):
     print('\nStarting build!')
     t0 = time.time()
 
+    print('\n\n=== E M A I L S ===')
+    tools.build_emails(data)
+
     print('\n\n=== C L E A N ===')
     if 'dist' in data['options']:
         print(f'cleaning {data["options"]["dist"]}...', end='')
         tools.clean(data['options']['dist'])
         print(' Done!')
+
+    print('\n\n=== I M A G E S ===')
+    if 'images' in data['options']:
+        tools.handle_images(data['options'])
+        # Automatically sync images to S3 during build
+        perform_image_sync(data)
 
     print('\n\n=== J S ===')
     if 'js' in data:
@@ -371,6 +380,54 @@ def perform_shared_deploy(env, stack_name, data):
         click.echo("Shared Infrastructure Deploy failed.")
         sys.exit(1)
 
+def inject_email_templates(env, template_file='template.yaml'):
+    """
+    Reads template.yaml and replaces placeholders with content from email_templates/{env}/.
+    Generates a new template file for deployment.
+    """
+    click.echo(f"Injecting email templates for {env}...")
+
+    if not os.path.exists(template_file):
+        click.echo(f"Error: {template_file} not found.")
+        sys.exit(1)
+
+    with open(template_file, 'r') as f:
+        lines = f.readlines()
+
+    new_lines = []
+    for line in lines:
+        if "REPLACE_WITH_FILE:" in line:
+            # Extract filename
+            parts = line.strip().split("REPLACE_WITH_FILE:")
+            if len(parts) > 1:
+                filename = parts[1].strip()
+                # Determine indentation
+                indentation = line[:line.find("REPLACE_WITH_FILE:")]
+
+                # Read the email template file
+                email_path = os.path.join('email_templates', env, filename)
+                if os.path.exists(email_path):
+                    with open(email_path, 'r') as email_f:
+                        content_lines = email_f.readlines()
+
+                    # Inject content with proper indentation
+                    for content_line in content_lines:
+                        new_lines.append(indentation + content_line)
+                else:
+                     click.echo(f"Warning: Email template {email_path} not found. Keeping placeholder.")
+                     new_lines.append(line)
+            else:
+                new_lines.append(line)
+        else:
+            new_lines.append(line)
+
+    output_file = f"template-{env}.yaml"
+    with open(output_file, 'w') as f:
+        f.writelines(new_lines)
+
+    click.echo(f"Generated {output_file} with injected email templates.")
+    return output_file
+
 def perform_sam_deploy(env, stack_name, data):
     """Executes SAM build and deploy."""
 
@@ -382,6 +439,9 @@ def perform_sam_deploy(env, stack_name, data):
 
     # Check stack status and offer cleanup
     check_stack_status(stack_name, data['options'])
+
+    # Inject email templates
+    template_file = inject_email_templates(env)
 
     # Identify secrets dynamically from template.yaml (NoEcho: true)
     # Merge with any explicitly defined secrets in config
@@ -396,7 +456,7 @@ def perform_sam_deploy(env, stack_name, data):
 
     click.echo(f"Building SAM application for {env}...")
     try:
-        subprocess.check_call(['sam', 'build', '--use-container'])
+        subprocess.check_call(['sam', 'build', '--use-container', '--template-file', template_file])
     except subprocess.CalledProcessError:
         click.echo("SAM Build failed.")
         sys.exit(1)
@@ -554,13 +614,17 @@ def build_local(config):
     build_site(data)
 
 @cli.command()
-def sync_images():
+@click.option('--env', type=click.Choice(['dev', 'prod']), prompt=True, help='Target environment.')
+def sync_images(env):
     """Syncs local images/ directory to the shared assets bucket."""
-    config_file = 'data.yaml'
+    config_file, _ = get_env_details(env)
 
     if not os.path.exists(config_file):
-        click.echo("Config file data.yaml not found.")
-        return
+        if os.path.exists('data.yaml'):
+            config_file = 'data.yaml'
+        else:
+            click.echo(f"Config file for {env} not found.")
+            return
 
     data = load_config(config_file)
     perform_image_sync(data)
