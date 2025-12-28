@@ -4,6 +4,7 @@ import boto3
 import urllib.request
 import urllib.error
 import traceback
+import re
 
 """
 Environment Variables:
@@ -25,7 +26,7 @@ def send_email(name, phone, email, message):
             os.environ['VERIFIED_EMAIL']
         ]},
       ReplyToAddresses=[
-          email.replace(" ", "")
+          email
         ],
         Content={
             'Simple': {
@@ -42,14 +43,53 @@ def send_email(name, phone, email, message):
         }
     )
 
+def validate_input(body):
+    """
+    Validates the input body for required fields and formats.
+    Returns (True, None) if valid, or (False, error_message) if invalid.
+    """
+    required_fields = ['name', 'email', 'message', 'token']
+    missing_fields = [field for field in required_fields if not body.get(field)]
+
+    if missing_fields:
+        return False, f"Missing required fields: {', '.join(missing_fields)}"
+
+    email = body.get('email', '').strip()
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        return False, "Invalid email format"
+
+    return True, None
+
 def lambda_handler(event, context):
+    headers = {
+        'Access-Control-Allow-Origin': '*'
+    }
+
     try:
+        if not event.get("body"):
+             return {
+                'statusCode': 400,
+                'headers': headers,
+                'body': json.dumps("Empty request body")
+            }
+
         body = json.loads(event["body"])
-        name = body.get("name")
-        phone = body.get("phone")
-        email = body.get("email")
-        message = body.get("message")
-        token = body.get("token")
+
+        # Input Validation
+        is_valid, error_msg = validate_input(body)
+        if not is_valid:
+             return {
+                'statusCode': 400,
+                'headers': headers,
+                'body': json.dumps(error_msg)
+            }
+
+        # Sanitize inputs
+        name = body.get("name", "").strip()
+        phone = body.get("phone", "").strip()
+        email = body.get("email", "").strip()
+        message = body.get("message", "").strip()
+        token = body.get("token", "").strip()
 
         recaptcha_payload = json.dumps({"event":
                                 {"token": token,
@@ -69,12 +109,18 @@ def lambda_handler(event, context):
 
         if data.get("riskAnalysis", {}).get("score", 0) > 0.5:
             send_email(name, phone, email, message)
-
-        return {'statusCode': 200,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': 'message sent'}
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': 'message sent'
+            }
+        else:
+             print(f"Recaptcha failed for {email} with score {data.get('riskAnalysis', {}).get('score')}")
+             return {
+                'statusCode': 400,
+                'headers': headers,
+                'body': json.dumps("Recaptcha verification failed")
+            }
 
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8')
@@ -83,9 +129,7 @@ def lambda_handler(event, context):
         traceback.print_exc()
         return {
             'statusCode': 500,
-            'headers': {
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': headers,
             'body': json.dumps("Error processing request.")
         }
 
@@ -93,8 +137,6 @@ def lambda_handler(event, context):
         traceback.print_exc()
         return {
             'statusCode': 500,
-            'headers': {
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': headers,
             'body': json.dumps("That's a problem!")
         }
