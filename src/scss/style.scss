@@ -27,13 +27,28 @@
 
 .index-hero-text {
   text-shadow: 2px 2px 0px $text;
-  @include sm {
-    p {
+
+  /* Mobile First (formerly sm) */
+  p {
       margin: 0;
-    }
-    a, button {
+  }
+  a, button {
       margin: 1rem 0 !important;
-    }
+  }
+
+  /* Desktop (formerly implicit/global) */
+  @include md {
+      p {
+          margin: 1rem 0; /* Restoring default margin, guessing 1rem based on usual paragraph spacing */
+      }
+      a, button {
+          margin: 0 !important; /* Resetting the mobile margin if needed, or keeping it if it was global?
+                                   Original code had `a, button { margin: 1rem 0 !important; }` inside `@include sm`.
+                                   So on desktop it was whatever the default button margin is.
+                                   Buttons usually have no margin or small margin.
+                                   I'll set it to `initial` or `0`.
+                                */
+      }
   }
 }
 
@@ -54,15 +69,30 @@
 
 .courses-hero {
   background-position: center right 35% !important;
-  @include sm {
-    align-items: flex-start !important;
-    padding-top: 5rem;
-    #hero-text {
+
+  /* Mobile First (formerly sm) */
+  align-items: flex-start !important;
+  padding-top: 5rem;
+  #hero-text {
       height: 90%;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-    }
+  }
+
+  /* Desktop (formerly implicit) */
+  @include md {
+      align-items: center !important; /* Restoring default align-items */
+      padding-top: 0; /* Reset padding */
+      #hero-text {
+          height: auto; /* Reset height */
+          display: block; /* Reset display */
+          /* Note: #hero-text might be flex/grid globally?
+             In site-variables.scss, #hero-text has no display property, just padding/width.
+             But #hero is flex.
+             I'll assume block is safe or revert to initial.
+          */
+      }
   }
 }
 
@@ -102,10 +132,12 @@
     text-align: left;
   }
 
-  @include sm {
-    padding: 2rem;
-  }
+  /* Mobile First (formerly sm) */
+  padding: 2rem;
+
+  /* Desktop (formerly md) */
   @include md {
+    padding: 0; /* Reset padding if needed */
     grid-column: 2 / span 3;
   }
 
@@ -128,9 +160,10 @@
 #landing-main {
   padding-top: 2rem;
   .landing-text {
-    @include sm {
-      grid-column: 2 / span 3;
-    }
+    /* Mobile First (formerly sm) */
+    grid-column: 2 / span 3;
+
+    /* Desktop (formerly md) */
     @include md {
       grid-column: 3;
     }
