@@ -15,25 +15,25 @@ $neo-border-color: $text;
 
 
 @mixin sm {
-  @media screen and (max-width: 1000px) {
+  @media screen and (min-width: 640px) {
     @content;
   }
 }
 
 @mixin md {
-  @media screen and (min-width: 1000px) {
+  @media screen and (min-width: 768px) {
     @content;
   }
 }
 
 @mixin lg {
-  @media screen and (min-width: 1400px) {
+  @media screen and (min-width: 1024px) {
     @content;
   }
 }
 
 @mixin xl {
-  @media screen and (min-width: 2000px) {
+  @media screen and (min-width: 1280px) {
     @content;
   }
 }
@@ -56,11 +56,12 @@ body {
 
 main {
   @media screen {
-    @include sm {
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    }
+    /* Mobile First (formerly sm) */
+    display: flex;
+    flex-direction: column;
+    position: relative;
+
+    /* Desktop (formerly md) */
     @include md {
       display: grid;
       grid-template-columns: 12.5% 12.5% 50% 12.5% 12.5%;
@@ -192,12 +193,29 @@ button:active, input[type="button"]:active, input[type="submit"]:active, .btn-ne
 }
 
 .page-text-wrapper {
-  padding-bottom: 4rem;
-  @include sm {
-    padding: 2rem;
-    max-width: 100%;
-  }
+  /* Mobile First (formerly sm) */
+  padding: 2rem;
+  max-width: 100%;
+  padding-bottom: 4rem; /* Global was padding-bottom: 4rem */
+
+  /* Desktop (formerly md) */
   @include md {
+    padding-left: 0; /* Resetting padding if needed, assuming default box model behavior but preserving bottom */
+    padding-right: 0;
+    padding-top: 0;
+    /* The original code had global padding-bottom: 4rem.
+       SM had padding: 2rem (overriding bottom?).
+       MD had grid-column: 3.
+       I'll keep padding-bottom 4rem globally effective, and reset the 2rem padding for desktop if it wasn't there before.
+       Actually, `page-text-wrapper` likely needs no padding on desktop if it's in a grid column, or maybe it does.
+       Original `md` mixin only added `grid-column: 3`. It inherited global styles.
+       So on desktop, it had `padding-bottom: 4rem` and `grid-column: 3`.
+       On mobile (sm), it had `padding: 2rem`, `max-width: 100%`.
+       So I must reset padding on MD to 0 (or initial) except bottom.
+    */
+    padding: 0;
+    padding-bottom: 4rem;
+    max-width: initial;
     grid-column: 3;
   }
 }
@@ -214,9 +232,11 @@ button:active, input[type="button"]:active, input[type="submit"]:active, .btn-ne
   border-bottom: $neo-border; /* Added border */
 
   display: flex;
-  @include sm {
-    align-items: flex-end;
-  }
+
+  /* Mobile First (formerly sm) */
+  align-items: flex-end;
+
+  /* Desktop (formerly md) */
   @include md {
     align-items: center;
   }
@@ -224,26 +244,31 @@ button:active, input[type="button"]:active, input[type="submit"]:active, .btn-ne
   #hero-text {
     text-shadow: $neo-shadow; /* Updated shadow */
 
-    @include sm {
-      padding: 2rem;
-      font-size: 1.6rem;
-    }
+    /* Mobile First (formerly sm) */
+    padding: 2rem;
+    font-size: 1.6rem;
+
+    /* Desktop (formerly md) */
     @include md {
+      padding: 0; /* Reset mobile padding */
       margin-left: 25%;
       width: 50%;
       font-size: 1.1rem;
     }
+
     @include lg {
       width: 30%;
     }
     button {
       /* Removed specific shadow, using default button style */
-      @include sm {
-        margin: 2rem 0;
-      }
+      /* Mobile First (formerly sm) */
+      margin: 2rem 0;
+
+      /* Desktop (formerly md) */
       @include md {
         margin: 0;
       }
+
       @include lg {
         margin: 2rem 0;
       }
@@ -255,6 +280,7 @@ button:active, input[type="button"]:active, input[type="submit"]:active, .btn-ne
     font-weight: 800;
     color: $darkblue;
     text-shadow: 2px 2px 0px white; /* Neo style */
+
     @include md {
       margin: 0;
     }
@@ -275,11 +301,13 @@ button:active, input[type="button"]:active, input[type="submit"]:active, .btn-ne
 .tile-wrapper {
   grid-column: 1 / span 5;
   display: flex;
-  @include sm {
-    flex-direction: column;
-  }
 
+  /* Mobile First (formerly sm) */
+  flex-direction: column;
+
+  /* Desktop (formerly md) */
   @include md {
+    flex-direction: row; /* Implicit default for flex, but let's be explicit to match md behavior */
     justify-content: center;
     flex-wrap: wrap;
     gap: 2rem;
@@ -339,47 +367,69 @@ button:active, input[type="button"]:active, input[type="submit"]:active, .btn-ne
 }
 
 .two-tile {
-  flex-basis: 40%;
-  @include sm {
-    flex-basis: 100%;
+  /* Mobile First (formerly sm) */
+  flex-basis: 100%;
+
+  /* Desktop (formerly standard) */
+  @include md {
+      flex-basis: 40%;
   }
 }
 
 .three-tile {
-  flex-basis: 26%;
-  @include sm {
-    flex-basis: 100%;
+  /* Mobile First (formerly sm) */
+  flex-basis: 100%;
+
+  /* Desktop (formerly standard) */
+  @include md {
+      flex-basis: 26%;
   }
 }
 
 .four-tile {
-  flex-basis: 20%;
-  @include sm {
-    flex-basis: 100%;
+  /* Mobile First (formerly sm) */
+  flex-basis: 100%;
+
+  /* Desktop (formerly standard) */
+  @include md {
+      flex-basis: 20%;
   }
 }
 
+/* Reordering Logic */
 .tile-sm-1 {
-  @include sm {
-    order: 1;
+  /* Mobile First (formerly sm) */
+  order: 1;
+
+  @include md {
+      order: initial;
   }
 }
 
 .tile-sm-2 {
-  @include sm {
-    order: 2;
+  /* Mobile First (formerly sm) */
+  order: 2;
+
+  @include md {
+      order: initial;
   }
 }
 
 .tile-sm-3 {
-  @include sm {
-    order: 3;
+  /* Mobile First (formerly sm) */
+  order: 3;
+
+  @include md {
+      order: initial;
   }
 }
 
 .tile-sm-4 {
-  @include sm {
-    order: 4;
+  /* Mobile First (formerly sm) */
+  order: 4;
+
+  @include md {
+      order: initial;
   }
 }
 

@@ -124,20 +124,6 @@
           &::after { transform: rotate(-45deg); bottom: 0; }
         }
       }
-    }
-
-    /* Checkbox Logic */
-    #menu-toggle {
-      display: none;
-
-      &:checked ~ .menu-btn {
-        background: $orange;
-        span {
-          background: transparent;
-          &::before { transform: rotate(45deg); top: 0; }
-          &::after { transform: rotate(-45deg); bottom: 0; }
-        }
-      }
 
       &:checked ~ .mobile-menu {
         display: flex;

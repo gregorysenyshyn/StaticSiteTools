@@ -91,16 +91,23 @@ h1, h2, h3, h4 {
     }
 
     .nav-courses {
-        @include sm {
-            display: none;
+        /* Mobile First (formerly sm -> display: none) */
+        display: none;
+
+        @include md {
+            display: block; /* Restore visibility on desktop */
         }
     }
 
     .phone-link {
         color: $darkblue;
         font-weight: 800;
-        @include sm {
-            display: none;
+
+        /* Mobile First (formerly sm -> display: none) */
+        display: none;
+
+        @include md {
+            display: block; /* Restore visibility on desktop */
         }
     }
   }
@@ -210,7 +217,21 @@ h1, h2, h3, h4 {
     border-top: $neo-border;
     box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
     z-index: 100;
-    display: none; /* JS will toggle */
+
+    /* Mobile First: Default is visible (JS toggles, but CSS base is display: block usually) */
+    /* Original code had display: none; but said "JS will toggle".
+       However, it had @include md { display: none !important; }
+       And no explicit display for mobile (inherited).
+       Wait, original code:
+       .sticky-cta {
+           display: none; // JS will toggle
+           @include md { display: none !important; }
+       }
+       This seems to mean it's hidden by default everywhere, and JS shows it on mobile?
+       The comment says "JS will toggle".
+       I'll keep `display: none` as base, and force `display: none !important` on desktop just in case JS tries to show it there.
+    */
+    display: none;
 
     @include md {
         display: none !important;
