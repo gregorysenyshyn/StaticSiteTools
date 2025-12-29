@@ -310,21 +310,22 @@ def perform_image_sync(data):
 
     # Get Bucket Name
     region = data['options'].get('aws_region_name', 'us-east-1')
-    outputs = get_stack_outputs(shared_stack, region, data['options'])
-    bucket_name = outputs.get('AssetsBucketName')
-
-    if not bucket_name:
-        print("Warning: Could not fetch AssetsBucketName from stack outputs. Defaulting to 'asyncacademy-assets'.")
-        bucket_name = 'asyncacademy-assets'
-
-    print(f"Syncing images to {bucket_name}...")
-
-    cmd = ['aws', 's3', 'sync', 'images/', f's3://{bucket_name}']
-
-    if 'aws_profile_name' in data['options']:
-        cmd.extend(['--profile', data['options']['aws_profile_name']])
 
     try:
+        outputs = get_stack_outputs(shared_stack, region, data['options'])
+        bucket_name = outputs.get('AssetsBucketName')
+
+        if not bucket_name:
+            print("Warning: Could not fetch AssetsBucketName from stack outputs. Defaulting to 'asyncacademy-assets'.")
+            bucket_name = 'asyncacademy-assets'
+
+        print(f"Syncing images to {bucket_name}...")
+
+        cmd = ['aws', 's3', 'sync', 'images/', f's3://{bucket_name}']
+
+        if 'aws_profile_name' in data['options']:
+            cmd.extend(['--profile', data['options']['aws_profile_name']])
+
         subprocess.check_call(cmd)
         print("Sync complete.")
     except subprocess.CalledProcessError:
@@ -332,6 +333,8 @@ def perform_image_sync(data):
         # We don't exit here so the build can continue if offline
     except FileNotFoundError:
         print("Warning: 'aws' command not found. Skipping image sync.")
+    except Exception as e:
+        print(f"Warning: Image sync failed due to error: {e}")
 
 def perform_shared_deploy(env, stack_name, data):
     """Executes SAM deploy for the shared infrastructure stack."""

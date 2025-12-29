@@ -6,6 +6,7 @@ import shutil
 import itertools
 import subprocess
 import json
+import re
 
 from jinja2 import BaseLoader
 from jinja2 import Environment
@@ -186,8 +187,18 @@ def handle_scss(data, dest_path):
 def handle_images(options):
     local_images = os.path.join(os.getcwd(),
                                 options['images'])
+    if not os.path.exists(local_images):
+        print(f"Warning: {local_images} does not exist. Skipping image link.")
+        return
+
     image_dest = options['dist']
+    os.makedirs(image_dest, exist_ok=True) # Ensure dist exists
+
     print((f'linking {local_images} to {image_dest}...'), end='')
+    # We want to link images INTO dist, i.e. dist/images -> local_images
+    # But current code does 'ln -s source dest'.
+    # If dest exists as dir, it makes dest/source.
+    # If dest is 'dist', it makes 'dist/images'. Correct.
     subprocess.run(['ln', '-s', local_images, image_dest])
     print(' Done!')
 
@@ -214,7 +225,9 @@ def handle_audio(options):
 
 def markdown_filter(text):
     markdown = mistune.create_markdown(
-    plugins=[RSTDirective([TableOfContents()])])
+        escape=False,
+        plugins=[RSTDirective([TableOfContents()])]
+    )
     return markdown(text)
 
 
@@ -223,6 +236,45 @@ def get_j2_env(pageset):
                       if pathset in ['partials', 'layouts']]
     j2_env = Environment(loader=GlobLoader(template_files), trim_blocks=True)
     j2_env.filters['markdown'] = markdown_filter
+
+    # Custom function to render a partial with specific context
+    def render_partial(template_name, context=None, parent_context=None):
+        """
+        Renders a partial template with a merged context.
+        The context argument should be a dictionary specific to that partial instance.
+        parent_context can be passed (usually _context from Jinja) to inherit globals.
+        """
+        if context is None:
+            context = {}
+
+        # We need to find the template. GlobLoader works with full paths in its internal list,
+        # but get_template expects the basename (because GlobLoader flattens the namespace).
+        # However, template_name from YAML might be 'generic-content', so we append .html if needed.
+        if not template_name.endswith('.html'):
+            template_name += '.html'
+
+        try:
+            template = j2_env.get_template(template_name)
+
+            final_context = {}
+            if parent_context:
+                # parent_context is a jinja2.runtime.Context object.
+                # We try to convert it to a dict or update from it.
+                try:
+                    if hasattr(parent_context, 'get_all'):
+                         final_context.update(parent_context.get_all())
+                    else:
+                         final_context.update(parent_context)
+                except Exception as e:
+                    print(f"Error updating context from parent: {e}")
+
+            final_context.update(context)
+
+            return template.render(final_context)
+        except Exception as e:
+            return f"<!-- Error rendering partial {template_name}: {e} -->"
+
+    j2_env.globals['render_partial'] = render_partial
     return j2_env
 
 
@@ -382,24 +434,24 @@ def build_emails(data):
     # Expected structure: src/emails/dev/*.html, src/emails/prod/*.html
     email_root = 'src/emails'
     template_root = 'email_templates'
-    
+
     if not os.path.exists(email_root):
         print(f"Warning: {email_root} not found. Skipping email build.")
         return
 
     # Setup Jinja Environment for Emails (Layouts and Partials are shared)
-    # GlobLoader requires glob patterns, not just directory names
     template_paths = [
-        'src/layouts/*.html', 
-        'src/partials/*.html', 
+        'src/layouts/*.html',
+        'src/partials/*.html',
         'src/partials/email/*.html'
     ]
     # Use DebugUndefined to preserve {{ variables }} for the backend to fill
     j2_env = Environment(
-        loader=GlobLoader(template_paths), 
+        loader=GlobLoader(template_paths),
         trim_blocks=True,
         undefined=DebugUndefined
     )
+    j2_env.filters['markdown'] = markdown_filter
 
     # Walk through subdirectories (environments) in src/emails
     for env in ['dev', 'prod']:
@@ -412,30 +464,64 @@ def build_emails(data):
         print(f"  Processing environment: {env}...")
         os.makedirs(dest_dir, exist_ok=True)
 
-        email_files = glob.glob(os.path.join(src_dir, '*.html'))
-        
+        # Process both HTML and Markdown files
+        email_files = glob.glob(os.path.join(src_dir, '*'))
+
         for email_file in email_files:
+            if not (email_file.endswith('.html') or email_file.endswith('.md')):
+                continue
+
             filename = os.path.basename(email_file)
+            name_no_ext = os.path.splitext(filename)[0]
             print(f"    Building {filename}...", end="")
-            
+
             try:
-                # Read source content
-                with open(email_file, 'r') as f:
-                    content = f.read()
-                
-                # Create a template from the content
-                template = j2_env.from_string(content)
-                
-                # Render with empty context
-                rendered_html = template.render()
-                
-                # Write to destination
-                dest_path = os.path.join(dest_dir, filename)
-                with open(dest_path, 'w') as f:
+                # Load Frontmatter and Content
+                fm_page = frontmatter.load(email_file)
+                metadata = fm_page.metadata
+                content = fm_page.content
+
+                # Determine Subject and Text Part
+                subject = metadata.get('subject', 'No Subject')
+                text_part = content # Default plain text is the raw content (markdown source)
+
+                # Render HTML
+                # 1. Render the body content (Markdown -> HTML or just Jinja render)
+                if email_file.endswith('.md'):
+                    # Convert markdown to HTML
+                    body_html = markdown_filter(content)
+                else:
+                    body_html = content
+
+                # 2. Wrap in Layout
+                # We construct a synthetic template string that extends the layout
+                # and injects the body_html into the 'content' block.
+                # Use the new layout 'email-layout-new.html' or 'email-layout.html'
+                layout_template = "{% extends 'email-layout-new.html' %}{% block content %}" + body_html + "{% endblock %}"
+
+                template = j2_env.from_string(layout_template)
+
+                # Render the full HTML
+                # Pass metadata to context in case it's used
+                rendered_html = template.render(metadata)
+
+                # OUTPUT 1: HTML File (for review)
+                html_dest_path = os.path.join(dest_dir, f"{name_no_ext}.html")
+                with open(html_dest_path, 'w') as f:
                     f.write(rendered_html)
-                    
+
+                # OUTPUT 2: JSON File (for deployment)
+                json_data = {
+                    "Subject": subject,
+                    "Html": rendered_html,
+                    "Text": text_part
+                }
+                json_dest_path = os.path.join(dest_dir, f"{name_no_ext}.json")
+                with open(json_dest_path, 'w') as f:
+                    json.dump(json_data, f, indent=2)
+
                 print(" Done!")
-                
+
             except Exception as e:
                 print(f" Failed: {e}")
 
