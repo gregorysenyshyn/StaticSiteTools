@@ -43,16 +43,18 @@ def lambda_handler(event, context):
 
         # 2. Save to DynamoDB
         lead_id = str(uuid.uuid4())
+
+        # Security: Prevent Mass Assignment / Parameter Manipulation
+        # Filter out system-controlled fields from user input
+        sensitive_fields = ['lead_id', 'timestamp', 'status']
+        safe_body = {k: v for k, v in body.items() if k not in sensitive_fields}
+
         item = {
             'lead_id': lead_id,
             'timestamp': datetime.utcnow().isoformat(),
             'status': 'NEW',
-            **body
+            **safe_body
         }
-
-        # Verify we aren't saving sensitive fields if they were somehow injected (though body is from user)
-        # Using explicit item construction above is safer than **body but **body is convenient for variable fields.
-        # Let's trust body fields for now but ensure system fields like lead_id are set by us.
 
         table.put_item(Item=item)
 
