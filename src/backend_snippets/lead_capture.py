@@ -2,6 +2,7 @@ import json
 import os
 import boto3
 import uuid
+import re
 from datetime import datetime
 import traceback
 
@@ -40,6 +41,15 @@ def lambda_handler(event, context):
                     "headers": headers,
                     "body": json.dumps({"error": f"Missing required field: {field}"})
                 }
+
+        # 1b. Validate Email
+        email = body.get('email', '').strip()
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            return {
+                "statusCode": 400,
+                "headers": headers,
+                "body": json.dumps({"error": "Invalid email format"})
+            }
 
         # 2. Save to DynamoDB
         lead_id = str(uuid.uuid4())
